@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 (28.10.2026)
+
+- Über eine Hand-Adresse angelegte Geräte bekommen nach dem ersten Verbinden den Anzeigenamen des Geräts statt der IP-Adresse (ein selbst vergebener Name bleibt).
+- Konfigurator: Hand-Adressen zeigen MAC, Version und Chip aus der zugehörigen Instanz.
+
 ## 0.3.0 (28.10.2026)
 
 - Neu: ESPHome-Konfigurator. Findet ESPHome-Geräte im Netz (mDNS über Symcons DNS-SD-Instanz) und legt sie samt Client Socket in einem Schritt an.

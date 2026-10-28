@@ -267,6 +267,11 @@ class ESPHomeHubGeraet extends IPSModule
                 $this->verbindungMerken(['zustand' => 'verbunden', 'text' => '', 'verschluesselt' => trim($this->ReadPropertyString('Schluessel')) !== '']);
                 $this->verbundenSetzen(true);
                 $this->SetStatus(IS_ACTIVE);
+                // Vom Konfigurator über eine Hand-Adresse angelegt: Instanz heißt noch wie die Adresse.
+                $anzeige = (string)($info['anzeigename'] ?: $info['name']);
+                if ($anzeige !== '' && IPS_GetName($this->InstanceID) === $this->host()) {
+                    IPS_SetName($this->InstanceID, $anzeige);
+                }
                 if ($vorher === 'getrennt') {
                     $this->LogMessage('Wieder verbunden mit ' . ($info['anzeigename'] ?: $info['name']) . '.', KL_MESSAGE);
                 }

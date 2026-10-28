@@ -159,6 +159,12 @@ class ESPHomeHubKonfigurator extends IPSModule
                 }
             }
             if ($treffer !== 0) {
+                // Von Hand eingetragen: was die Suche nicht liefert, aus der Geräteinfo der Instanz ergänzen.
+                $info = $instanzen[$treffer]['info'];
+                $g['mac'] = $g['mac'] ?: $instanzen[$treffer]['mac'];
+                $g['version'] = $g['version'] ?: (string)($info['version'] ?? '');
+                $g['chip'] = $g['chip'] ?: (string)($info['modell'] ?? '');
+                $g['name'] = $g['quelle'] === 'hand' && ($info['name'] ?? '') !== '' ? (string)$info['name'] : $g['name'];
                 unset($instanzen[$treffer]);
             }
             $anzeige = $g['anzeigename'] !== '' ? $g['anzeigename'] : $g['name'];

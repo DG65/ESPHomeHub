@@ -138,7 +138,7 @@ function IPS_GetKernelRunlevel() { return KR_READY; }
 $GLOBALS['NAME'] = 'Wohnzimmer';
 $GLOBALS['VERBUNDEN_MIT'] = 20000;
 function IPS_GetName($id) { return $id === 20000 ? $GLOBALS['SOCKET']['name'] : $GLOBALS['NAME']; }
-function IPS_SetName($id, $n) { if ($id === 20000) { $GLOBALS['SOCKET']['name'] = $n; } }
+function IPS_SetName($id, $n) { if ($id === 20000) { $GLOBALS['SOCKET']['name'] = $n; } else { $GLOBALS['UMBENANNT'] = $n; } }
 function IPS_CreateInstance($g) { $GLOBALS['TRANSPORT']?->schliessen(); $GLOBALS['SOCKET'] = ['id' => 20000, 'Host' => '', 'Port' => 0, 'Open' => false, 'status' => IS_INACTIVE, 'name' => '']; $GLOBALS['ANGELEGT'] = ($GLOBALS['ANGELEGT'] ?? 0) + 1; return 20000; }
 function IPS_ConnectInstance($id, $eltern) { $GLOBALS['VERBUNDEN_MIT'] = $eltern; return true; }
 function IPS_DeleteInstance($id) { return true; }
@@ -521,6 +521,19 @@ $GLOBALS['Z'][10000]['p']['Host'] = 'weg.local';
 geraet()->ApplyChanges();
 pruefe(zustand()['status'] === 203, 'nicht erreichbar: Status 203');
 
+// Instanz heißt wie ihre Adresse (vom Konfigurator per Hand-Adresse angelegt) → nach dem Verbinden Anzeigename
+$GLOBALS['Z'][10000]['p']['Host'] = 'sim.local';
+$GLOBALS['NAME'] = 'sim.local';
+$GLOBALS['UMBENANNT'] = null;
+geraet()->Neuverbinden();
+pumpen();
+pruefe($GLOBALS['UMBENANNT'] === 'Simulator Küche', 'Instanz mit Adresse als Name bekommt den Anzeigenamen des Geräts');
+$GLOBALS['NAME'] = 'Wohnzimmer';
+$GLOBALS['UMBENANNT'] = null;
+geraet()->Neuverbinden();
+pumpen();
+pruefe($GLOBALS['UMBENANNT'] === null, 'selbst gewählter Instanzname bleibt');
+
 // Langer Instanzname mit Umlaut an der Schnittgrenze: Gerät kürzt client_info auf 31 Byte (live 28.10.2026)
 $GLOBALS['NAME'] = 'ESPHome-Test (Claude, löschen)';
 $GLOBALS['Z'][10000]['p']['Host'] = 'sim.local';
@@ -576,6 +589,21 @@ $c = $zeilen['kueche']['create'] ?? [];
 pruefe(($c[0]['moduleID'] ?? '') === '{796D9D82-B2F7-4F80-BAA7-8CC50237B2EF}' && ($c[0]['configuration'] ?? []) === ['Host' => '192.168.2.78', 'Port' => 6053]
     && ($c[1]['moduleID'] ?? '') === '{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}' && ($c[1]['configuration']['Host'] ?? '') === '192.168.2.78', 'Anlegen als Kette: Gerät + Client Socket mit Adresse');
 pruefe(($zeilen['10.0.5.9']['quelle'] ?? '') === 'von Hand eingetragen' && ($zeilen['10.0.5.9']['adresse'] ?? '') === '10.0.5.9:6060' && ($zeilen['10.0.5.9']['schluessel'] ?? '') === '?', 'Hand-Adresse mit eigenem Port');
+
+// Hand-Adresse, zu der schon eine Instanz gehört: MAC/Version aus deren Geräteinfo (live 28.10.2026)
+$GLOBALS['ZC'] = [];
+$GLOBALS['Z'][11000]['p']['Adressen'] = json_encode([['Adresse' => '192.168.2.50', 'Port' => 6053]]);
+$hz = json_decode((string)$k->GetConfigurationForm(), true);
+$hw = [];
+array_walk_recursive($hz, function () {});
+foreach ($hz['elements'] as $el) {
+    foreach ($el['items'] ?? [] as $it) {
+        if (($it['type'] ?? '') === 'Configurator') {
+            $hw = $it['values'];
+        }
+    }
+}
+pruefe(count($hw) === 1 && $hw[0]['instanceID'] === 10000 && $hw[0]['mac'] === 'AA:BB:CC:00:00:01' && $hw[0]['version'] === '2026.10.1' && $hw[0]['geraet'] === 'sim', 'Hand-Zeile mit vorhandener Instanz: MAC, Version, Name aus der Geräteinfo');
 $kopf = '';
 array_walk_recursive($form['elements'], function ($v, $key) use (&$kopf) {
     if ($key === 'caption' && str_contains((string)$v, 'im Netz gefunden (zuletzt')) {
