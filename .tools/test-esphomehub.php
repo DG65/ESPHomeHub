@@ -205,6 +205,7 @@ function IPS_SetProperty($id, $k, $v) { $GLOBALS['SOCKET'][$k] = $v; }
 function IPS_SetConfiguration($id, $json) { foreach (json_decode($json, true) as $k => $v) { $GLOBALS['SOCKET'][$k] = $v; } }
 function IPS_ApplyChanges($id)
 {
+    $GLOBALS['SOCKET_APPLY'] = ($GLOBALS['SOCKET_APPLY'] ?? 0) + 1;
     $s = &$GLOBALS['SOCKET'];
     $t = $GLOBALS['TRANSPORT'];
     $t?->schliessen();
@@ -503,6 +504,25 @@ $GLOBALS['MAINTAIN'] = [];
 geraet()->Neuverbinden();
 pumpen();
 pruefe(($GLOBALS['MAINTAIN'] ?? []) === [] && zustand()['status'] === 102, 'zweite Verbindung: keine Variable neu geschrieben');
+
+// ApplyChanges ohne Änderung (Symcon-Start, Modul-Update): Socket nicht anfassen (live 28.10.2026: SIGABRT nach
+// mehrfachem Schließen/Öffnen innerhalb einer Sekunde)
+$GLOBALS['SOCKET_APPLY'] = 0;
+$sim->empfangen = [];
+geraet()->ApplyChanges();
+pumpen();
+pruefe($GLOBALS['SOCKET_APPLY'] === 0 && $sim->empfangen === [] && zustand()['status'] === 102, 'unverändertes Übernehmen: Socket und Sitzung bleiben');
+$GLOBALS['Z'][10000]['b']['Sitzung'] = '';   // z. B. nach Modul-Update ohne Puffer
+geraet()->ApplyChanges();
+pumpen();
+pruefe($GLOBALS['SOCKET_APPLY'] === 0 && $sim->empfangen === [1, 9, 11, 20] && zustand()['status'] === 102, 'ohne Sitzung, Socket offen: nur neue API-Sitzung, kein Socket-Wechsel');
+$GLOBALS['Z'][10000]['p']['Port'] = 6054;
+$GLOBALS['Z'][10000]['p']['Port'] = 6053;
+$GLOBALS['Z'][10000]['a']['Angewendet'] = 'anders';
+$sim->empfangen = [];
+geraet()->ApplyChanges();
+pumpen();
+pruefe($GLOBALS['SOCKET_APPLY'] >= 1 && $sim->empfangen === [1, 9, 11, 20], 'geänderte Adresse/Schlüssel: Socket wird neu aufgebaut');
 
 $GLOBALS['ANTWORT'][] = ESPHomeHubProtokoll::klartextRahmen(7, '');
 pumpen();

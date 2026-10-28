@@ -57,6 +57,7 @@ class ESPHomeHubGeraet extends IPSModule
         $this->RegisterAttributeString('Entitaeten', '{}');
         $this->RegisterAttributeString('NichtUnterstuetzt', '[]');
         $this->RegisterAttributeBoolean('Gesperrt', false);
+        $this->RegisterAttributeString('Angewendet', '');
         $this->RegisterAttributeInteger('Eltern', 0);
         $this->registerFormAttributes();
 
@@ -83,10 +84,31 @@ class ESPHomeHubGeraet extends IPSModule
 
         // Jede Übernahme ist ein neuer Versuch, auch nach einem Schlüsselfehler.
         $this->WriteAttributeBoolean('Gesperrt', false);
-        $this->sitzungVerwerfen();
         $this->elternBeobachten();
 
         $schluessel = trim($this->ReadPropertyString('Schluessel'));
+        // Den Socket nur neu aufbauen, wenn sich Adresse, Port oder Schlüssel geändert haben. ApplyChanges
+        // läuft auch bei jedem Symcon-Start und Modul-Update; ein Zwangs-Schließen/Öffnen ist dort unnötig.
+        // Live 28.10.2026: Symcon brach 2 s nach mehrfachem Schließen/Öffnen innerhalb einer Sekunde ab
+        // (SIGABRT, Ursache offen) — seitdem so wenig Socket-Wechsel wie möglich.
+        $kennung = $this->host() . '|' . $this->ReadPropertyInteger('Port') . '|' . hash('sha256', $schluessel);
+        $unveraendert = $kennung === $this->ReadAttributeString('Angewendet');
+        $this->WriteAttributeString('Angewendet', $kennung);
+        $eltern = $this->eltern();
+        $elternAktiv = $eltern > 0 && IPS_GetInstance($eltern)['InstanceStatus'] === IS_ACTIVE
+            && IPS_GetProperty($eltern, 'Host') === $this->host() && (int)IPS_GetProperty($eltern, 'Port') === $this->ReadPropertyInteger('Port');
+        $sitzung = ESPHomeHubSitzung::import($this->GetBuffer('Sitzung'));
+        if ($this->host() !== '' && $unveraendert && $elternAktiv) {
+            $this->SetTimerInterval('Wache', self::WACHE_S * 1000);
+            $this->socketBenennen();
+            if ($sitzung === null || !$sitzung->bereit()) {
+                // Socket steht schon: nur die API-Sitzung neu beginnen, ohne Schließen/Öffnen.
+                $this->sitzungVerwerfen();
+                $this->sitzungStarten();
+            }
+            return;
+        }
+        $this->sitzungVerwerfen();
         if ($this->host() === '') {
             $this->SetStatus(104);
             $this->SetTimerInterval('Wache', 0);
@@ -104,8 +126,8 @@ class ESPHomeHubGeraet extends IPSModule
         $this->SetTimerInterval('Wache', self::WACHE_S * 1000);
         $this->socketBenennen();
         $this->verbindungMerken(['zustand' => 'verbinde']);
-        // Neu verbinden, damit eine geänderte Adresse oder ein neuer Schlüssel sofort greift.
-        $this->elternEinstellen(true, true);
+        // Geänderte Adresse/Schlüssel: neu verbinden, damit es sofort greift. Sonst nur öffnen, falls zu.
+        $this->elternEinstellen(true, !$unveraendert);
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)

@@ -51,6 +51,16 @@
 - Live 28.10.2026 gegen das Host-Testgerät mit allen Typen: 15 Entitäten, 18 Befehle zurückgemeldet,
   Zeitabfrage beantwortet, Ereignis nach Knopf.
 
+## Socket-Wechsel sparsam (0.3.3)
+
+- **Live 28.10.2026 18:09:10: Symcon brach mit SIGABRT ab**, 2 s nach MC_UpdateModule + ESPH_Neuverbinden; im Log davor
+  mehrfaches Schließen/Öffnen des Client Sockets innerhalb einer Sekunde. Ursache offen (Absturz auch schon am 25.10.,
+  vor ESPHomeHub). Symcon lud beim Neustart die Einstellungen von 18:04:49, alles danach war weg.
+- Seitdem: ApplyChanges vergleicht `Angewendet` (Host|Port|sha256(Schlüssel)). Unverändert + Socket aktiv → kein
+  Socket-Wechsel, höchstens neue API-Sitzung. Prüfstand zählt Socket-ApplyChanges.
+- Kein MC_UpdateModule bei aktiven ESPHomeHub-Instanzen im Live-System ohne Dietmars Okay.
+- Zeitzone (0.3.2) bestätigt an einem mit TZ=UTC gebauten Host-Gerät: zeigt danach Ortszeit.
+
 ## Zeitzone (0.3.2)
 
 - GetTimeResponse = epoch (fixed32) + `timezone` (POSIX-Text, veraltet) + `parsed_timezone` (Feld 3, sint32 ZigZag,

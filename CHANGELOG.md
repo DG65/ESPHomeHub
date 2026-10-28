@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3 (28.10.2026)
+
+- Übernehmen ohne Änderung, Symcon-Start und Modul-Update bauen die Verbindung nicht mehr zwangsweise neu auf. Steht der Socket schon, beginnt nur die API-Sitzung neu; geschlossen und geöffnet wird er nur bei neuer Adresse, neuem Port oder neuem Schlüssel.
+
 ## 0.3.2 (28.10.2026)
 
 - Zeitanfrage des Geräts mit Zeitzone und Sommerzeit-Regeln beantwortet (`parsed_timezone`, seit ESPHome 2026.9 nötig). Vorher zeigte ein Gerät die Zeitzone seines Build-Rechners, oft UTC. Funktioniert auch ohne zoneinfo-Dateien (Symcon unter Windows).
