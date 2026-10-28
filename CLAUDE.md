@@ -20,7 +20,7 @@
   ServerHello `01`+Name\0+MAC\0, dann `00`+Nachricht 2 bzw. `01`+„Handshake MAC failure".
   Danach Rahmen `01`+2 Byte Länge, Inhalt verschlüsselt: 2 Byte Typ + 2 Byte Länge + Protobuf.
 - **Keine AuthenticationRequest** mehr nötig; nach HelloResponse gleich DeviceInfo usw.
-- **`object_id` (Feld 1) kommt leer** → Entitäten über `key` (fixed32) identifizieren (Stufe 2).
+- **`object_id` (Feld 1) kommt leer** → Entitäten über `key` (fixed32): Ident `e%08x` + `_x` je Teilvariable.
 - Gerät pingt **fest alle 60 s**, auch wenn es laufend Zustände schickt. Nach DisconnectRequest auf
   DisconnectResponse warten, sonst „Reading failed CONNECTION_CLOSED" im Geräte-Log.
 - `supported_color_modes` kommt gepackt; Floats sind 32 Bit (22,089 statt 22,1).
@@ -38,6 +38,19 @@
   Neu-Registrieren verloren (SUITE.md Stolperstein 5), der Schlüssel wird bei jeder Verbindung gebraucht.
   Abweichung von der Credentials-Regel (Attribut) — Dietmar am 28.10.2026 vorgelegt.
 - Schlüssel-/Verschlüsselungsfehler → `Gesperrt`, Socket zu, bis zur nächsten Übernahme.
+
+## Entitäten (0.2.0)
+
+- `libs/ESPHomeHubEntitaeten.php`: beschreiben/variablen/zustand/befehl je Typ, rein ohne Symcon.
+  `.tools/fixture-entitaeten.json` kommt aus aioesphomeapi `api_pb2` (`.tools/fixture-entitaeten.py`):
+  Beschreibungen, Zustände und **Befehls-Bytes byte-gleich** zu Python. Deshalb `feldFloat` ohne 0.0 (proto3).
+- Sitzung: nach DeviceInfo → ListEntities (11), nach Done (19) → SubscribeStates (20); GetTimeRequest (36)
+  → GetTimeResponse (37). Variablen erst nach vollständiger Liste anlegen.
+- Darstellung nur bei Abweichung neu schreiben (`variableSicherstellen`, sonst Update-Sturm), Name/Position
+  eines Bestands nie überschreiben, verschwundene Entitäten nicht löschen (Archiv).
+- Variable folgt der Rückmeldung (State), außer Knopf/Fahrbefehl/Schloss-Öffnen (kein State) → sofort.
+- Live 28.10.2026 gegen das Host-Testgerät mit allen Typen: 15 Entitäten, 18 Befehle zurückgemeldet,
+  Zeitabfrage beantwortet, Ereignis nach Knopf.
 
 ## Offen / am echten Gerät prüfen
 

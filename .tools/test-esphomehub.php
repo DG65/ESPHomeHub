@@ -30,7 +30,15 @@ const IS_EBASE = 200;
 const KL_MESSAGE = 10201;
 const KL_WARNING = 10204;
 const VARIABLETYPE_BOOLEAN = 0;
+const VARIABLETYPE_INTEGER = 1;
+const VARIABLETYPE_FLOAT = 2;
+const VARIABLETYPE_STRING = 3;
 const VARIABLE_PRESENTATION_VALUE_PRESENTATION = '{3319437D-7CDE-699D-750A-3C6A3841FA75}';
+const VARIABLE_PRESENTATION_SWITCH = '{60AE6B26-B3E2-BDB1-A3A9-BE232E83A15A}';
+const VARIABLE_PRESENTATION_SLIDER = '{6B9CAEEC-5958-C223-30F7-BD36569FC57A}';
+const VARIABLE_PRESENTATION_ENUMERATION = '{52D9E126-D7D2-2CBB-5E62-4CF7BA7C5D82}';
+const VARIABLE_PRESENTATION_VALUE_INPUT = '{6F477326-1683-A2FD-D2E7-477F366ECB62}';
+const VARIABLE_PRESENTATION_COLOR = '{05CC3CC2-A0B2-5837-A4A7-A07EA0B9DDFB}';
 
 $ROOT = dirname(__DIR__);
 $FEHLER = 0;
@@ -111,6 +119,7 @@ class IPSModule
     }
     protected function MaintainVariable($ident, $name, $typ, $pres, $pos, $behalten)
     {
+        $GLOBALS['MAINTAIN'][] = $ident;
         if ($behalten) {
             $this->z()['v'][$ident] ??= ['typ' => $typ, 'wert' => false];
             $this->z()['v'][$ident]['pres'] = $pres;
@@ -118,8 +127,9 @@ class IPSModule
             unset($this->z()['v'][$ident]);
         }
     }
-    protected function GetIDForIdent($ident) { return isset($this->z()['v'][$ident]) ? 30000 : false; }
+    protected function GetIDForIdent($ident) { $GLOBALS['ZULETZT'] = $ident; return isset($this->z()['v'][$ident]) ? 30000 : false; }
     protected function GetValue($ident) { return $this->z()['v'][$ident]['wert']; }
+    protected function EnableAction($ident) { $this->z()['v'][$ident]['aktion'] = true; }
     protected function SetValue($ident, $w) { $this->z()['v'][$ident]['wert'] = $w; }
 }
 
@@ -142,6 +152,12 @@ function IPS_GetInstance($id)
     return ['ConnectionID' => $GLOBALS['VERBUNDEN_MIT']];
 }
 function IPS_GetProperty($id, $k) { return $GLOBALS['SOCKET'][$k]; }
+// Variablen-Ersatz: ID 30000+n je Ident (GetIDForIdent liefert 30000 für jede vorhandene Variable).
+function IPS_GetVariablePresentation($id) { return $GLOBALS['Z'][10000]['v'][$GLOBALS['ZULETZT']]['pres'] ?? []; }
+function IPS_GetVariable($id) { return ['VariableType' => $GLOBALS['Z'][10000]['v'][$GLOBALS['ZULETZT']]['typ']]; }
+function IPS_GetObject($id) { return ['ObjectPosition' => 0]; }
+function IPS_SetPosition($id, $p) { return true; }
+function GetValueFormatted($id) { return '…'; }
 function IPS_SetProperty($id, $k, $v) { $GLOBALS['SOCKET'][$k] = $v; }
 function IPS_SetConfiguration($id, $json) { foreach (json_decode($json, true) as $k => $v) { $GLOBALS['SOCKET'][$k] = $v; } }
 function IPS_ApplyChanges($id)
@@ -209,7 +225,7 @@ $fahren = function (int $stueck, bool $umladen) use ($fx, $h, $psk): array {
     $log = ['start' => $raus === $h('client_start')];
     $gesendet = '';
     $ereignisse = [];
-    $eingang = $h('server_hello') . $h('server_handshake') . $h('server_hello_response') . $h('server_device_info') . $h('server_ping') . $h('server_unbekannt');
+    $eingang = $h('server_hello') . $h('server_handshake') . $h('server_hello_response') . $h('server_device_info') . $h('server_liste') . $h('server_zustand') . $h('server_ping') . $h('server_unbekannt');
     foreach (str_split($eingang, $stueck) as $teil) {
         $e = $s->empfangen($teil);
         $gesendet .= $e['senden'];
@@ -218,23 +234,23 @@ $fahren = function (int $stueck, bool $umladen) use ($fx, $h, $psk): array {
             $s = ESPHomeHubSitzung::import($s->export());
         }
     }
-    $log['gesendet'] = $gesendet === $h('client_hello') . $h('client_device_info_request') . $h('client_pong');
+    $log['gesendet'] = $gesendet === $h('client_hello') . $h('client_device_info_request') . $h('client_list_entities') . $h('client_abo') . $h('client_pong');
     $log['ereignisse'] = array_map(fn ($e) => $e[0], $ereignisse);
     $log['geraet'] = array_values(array_filter($ereignisse, fn ($e) => $e[0] === 'geraet'))[0][1] ?? [];
     $log['server'] = $s->server();
     $log['bereit'] = $s->bereit();
-    $log['unbekannt'] = array_values(array_filter($ereignisse, fn ($e) => $e[0] === 'nachricht'))[0] ?? null;
+    $log['nachrichten'] = array_map(fn ($e) => $e[1], array_values(array_filter($ereignisse, fn ($e) => $e[0] === 'nachricht')));
     return $log;
 };
 foreach ([[4096, false], [1, false], [1, true], [5, true]] as [$stueck, $umladen]) {
     $l = $fahren($stueck, $umladen);
     $wie = "Stücke à $stueck Byte" . ($umladen ? ', Export/Import' : '');
     pruefe($l['start'], "ClientHello + Handshake-Nachricht 1 identisch ($wie)");
-    pruefe($l['gesendet'], "HelloRequest, DeviceInfoRequest, PingResponse identisch verschlüsselt ($wie)");
-    pruefe($l['ereignisse'] === ['hello', 'geraet', 'ping', 'nachricht'], "Ereignisfolge ($wie): " . implode(',', $l['ereignisse']));
+    pruefe($l['gesendet'], "Hello, DeviceInfo, ListEntities, SubscribeStates, PingResponse identisch verschlüsselt ($wie)");
+    pruefe($l['ereignisse'] === ['hello', 'geraet', 'nachricht', 'nachricht', 'entitaetenFertig', 'nachricht', 'ping', 'nachricht'], "Ereignisfolge ($wie): " . implode(',', $l['ereignisse']));
     pruefe($l['bereit'] && ($l['geraet']['anzeigename'] ?? '') === 'Fixtur Gerät' && ($l['geraet']['hersteller'] ?? '') === 'Espressif', "DeviceInfo gelesen ($wie)");
     pruefe($l['server'] === ['name' => 'fixtur', 'mac' => 'AABBCCDDEEFF'], "ServerHello Name/MAC ($wie)");
-    pruefe(($l['unbekannt'][1] ?? 0) === 25, "unbekannte Nachricht wird durchgereicht ($wie)");
+    pruefe($l['nachrichten'] === [16, 17, 25, 250], "Liste, Zustand und unbekannte Nachricht werden durchgereicht ($wie)");
 }
 try {
     $n = ESPHomeHubNoise::starten($h('e_init'));
@@ -266,6 +282,37 @@ $kaputt[10] = chr(ord($kaputt[10]) ^ 1);
 $e = $s->empfangen($kaputt);
 pruefe(($e['ereignisse'][0][0] ?? '') === 'fehler', 'verfälschter Rahmen nach dem Handshake wird erkannt');
 
+// ------------------------------------------------------------------ 3b. Entitäten gegen api_pb2
+abschnitt('Entitäten gegen aioesphomeapi api_pb2 (Beschreibung, Zustand, Befehl)');
+$fe = json_decode((string)file_get_contents(__DIR__ . '/fixture-entitaeten.json'), true);
+$ents = [];
+foreach ($fe['liste'] as $l) {
+    $e = ESPHomeHubEntitaeten::beschreiben($l['typ'], (string)hex2bin($l['daten']));
+    if ($e !== null) {
+        $ents[$e['key']] = $e;
+        pruefe($e['name'] === $l['name'], 'Name gelesen: ' . $l['name']);
+        pruefe(ESPHomeHubEntitaeten::variablen($e, 'Gerät') !== [], 'Variablen für ' . $e['typ']);
+    } else {
+        pruefe(isset(ESPHomeHubEntitaeten::NICHT_UNTERSTUETZT[$l['typ']]), 'nur bekannte Typen übergangen: ' . $l['typ']);
+    }
+}
+pruefe(count($ents) === 17, '17 von 18 Entitäten beschrieben');
+foreach ($fe['zustaende'] as $z) {
+    $ist = ESPHomeHubEntitaeten::zustand($z['typ'], (string)hex2bin($z['daten']), $ents[$z['key']]);
+    $ok = count($ist) === count($z['erwartet']);
+    foreach ($z['erwartet'] as $k => $w) {
+        $ok = $ok && array_key_exists($k, $ist) && (is_float($w) || is_float($ist[$k]) ? abs($ist[$k] - $w) < 1e-6 : $ist[$k] === $w);
+    }
+    pruefe($ok, 'Zustand ' . $ents[$z['key']]['typ'] . ' ' . json_encode($z['erwartet'], JSON_UNESCAPED_UNICODE) . ' → ' . json_encode($ist, JSON_UNESCAPED_UNICODE));
+}
+foreach ($fe['befehle'] as $c) {
+    $e = $ents[$c['key']];
+    [$typ, $daten] = ESPHomeHubEntitaeten::befehl($e, $c['teil'], $c['wert']);
+    pruefe($typ === $c['typ'] && bin2hex($daten) === $c['daten'], 'Befehl ' . $e['typ'] . '/' . $c['teil'] . ' = ' . json_encode($c['wert']) . ': ' . bin2hex($daten) . ' erwartet ' . $c['daten']);
+}
+$id = ESPHomeHubEntitaeten::ident(0xDEADBEEF, 'h');
+pruefe($id === 'edeadbeef_h' && ESPHomeHubEntitaeten::identLesen($id) === [0xDEADBEEF, 'h'] && ESPHomeHubEntitaeten::identLesen('Verbunden') === null, 'Ident hin und zurück');
+
 // ------------------------------------------------------------------ 4. Gerätemodul mit simuliertem Gerät
 abschnitt('Gerätemodul gegen simuliertes Gerät (unverschlüsselt)');
 
@@ -275,6 +322,7 @@ final class SimGeraet
     public bool $offen = false;
     public array $empfangen = [];
     public string $clientInfo = '';
+    public array $daten = [];
     private string $puffer = '';
     public function oeffnen(string $host, int $port): bool { $this->offen = $host === 'sim.local'; return $this->offen; }
     public function schliessen(): void { $this->offen = false; $this->puffer = ''; }
@@ -283,12 +331,16 @@ final class SimGeraet
         $this->puffer .= $bytes;
         while (($r = ESPHomeHubProtokoll::rahmenLesen($this->puffer)) !== null) {
             $this->empfangen[] = $r[1];
+            $this->daten[] = $r[2];
             if ($r[1] === 1) {
                 $this->clientInfo = ESPHomeHubProtokoll::text(ESPHomeHubProtokoll::zerlegen($r[2]), 1);
             }
             $antwort = match ($r[1]) {
                 1 => ESPHomeHubProtokoll::klartextRahmen(2, ESPHomeHubProtokoll::feldZahl(1, 1) . ESPHomeHubProtokoll::feldZahl(2, 19) . ESPHomeHubProtokoll::feldText(4, 'sim')),
                 9 => ESPHomeHubProtokoll::klartextRahmen(10, ESPHomeHubProtokoll::feldText(2, 'sim') . ESPHomeHubProtokoll::feldText(4, '2026.10.1') . ESPHomeHubProtokoll::feldText(6, 'esp32dev') . ESPHomeHubProtokoll::feldText(13, 'Simulator Küche')),
+                11 => $GLOBALS['SIM_LISTE'],
+                20 => $GLOBALS['SIM_ZUSTAENDE'],
+                33 => ESPHomeHubProtokoll::klartextRahmen(26, $r[2]),   // Schalter: Gerät meldet den neuen Zustand zurück
                 default => '',
             };
             // Antwort absichtlich in 3-Byte-Stücken zurück (TCP darf beliebig zerlegen).
@@ -308,6 +360,10 @@ function pumpen(): void
     }
 }
 
+// Das simulierte Gerät meldet alle Entitäten und Zustände aus der api_pb2-Referenz (fixture-entitaeten.json).
+$fe = json_decode((string)file_get_contents(__DIR__ . '/fixture-entitaeten.json'), true);
+$GLOBALS['SIM_LISTE'] = implode('', array_map(fn ($l) => ESPHomeHubProtokoll::klartextRahmen($l['typ'], (string)hex2bin($l['daten'])), $fe['liste'])) . ESPHomeHubProtokoll::klartextRahmen(19, '');
+$GLOBALS['SIM_ZUSTAENDE'] = implode('', array_map(fn ($z) => ESPHomeHubProtokoll::klartextRahmen($z['typ'], (string)hex2bin($z['daten'])), $fe['zustaende']));
 $GLOBALS['ANTWORT'] = [];
 $sim = new SimGeraet();
 $GLOBALS['TRANSPORT'] = $sim;
@@ -322,10 +378,59 @@ geraet()->ApplyChanges();
 pumpen();
 pruefe($GLOBALS['SOCKET']['Open'] === true && $GLOBALS['SOCKET']['Host'] === 'sim.local' && $GLOBALS['SOCKET']['Port'] === 6053, 'Socket auf Adresse und Port 6053 gestellt');
 pruefe($GLOBALS['SOCKET']['name'] === 'ESPHome-Verbindung (Wohnzimmer)', 'Socket sprechend benannt');
-pruefe($sim->empfangen === [1, 9], 'Hello und DeviceInfoRequest gesendet');
+pruefe($sim->empfangen === [1, 9, 11, 20], 'Hello, DeviceInfo, ListEntities, SubscribeStates gesendet');
 pruefe(zustand()['status'] === 102 && zustand()['v']['Verbunden']['wert'] === true, 'verbunden: Status 102, Variable Verbunden = true');
 $info = json_decode(geraet()->GetDeviceInfo(), true);
 pruefe(($info['anzeigename'] ?? '') === 'Simulator Küche' && ($info['modell'] ?? '') === 'esp32dev', 'GetDeviceInfo liefert die Geräteinfo');
+
+// Entitäten → Variablen
+$v = zustand()['v'];
+pruefe(count(json_decode(geraet()->GetEntities(), true)) === 17, '17 unterstützte Entitäten übernommen (Sirene übergangen)');
+pruefe(str_contains(zustand()['a']['NichtUnterstuetzt'], 'siren'), 'Sirene als nicht unterstützt vermerkt');
+pruefe(($v['e00000005']['pres']['PRESENTATION'] ?? '') === VARIABLE_PRESENTATION_SWITCH && ($v['e00000005']['aktion'] ?? false), 'Schalter: SWITCH mit Aktion');
+pruefe(($v['e00000001']['pres']['SUFFIX'] ?? '') === ' °C' && ($v['e00000001']['pres']['DIGITS'] ?? -1) === 1 && !isset($v['e00000001']['aktion']), 'Sensor: Einheit, Nachkommastellen, keine Aktion');
+pruefe(($v['e00000002']['pres']['DIGITS'] ?? -1) === 0, 'negative accuracy_decimals → 0 Stellen');
+pruefe(isset($v['e0000000a_h'], $v['e0000000a_f'], $v['e0000000a_k']) && ($v['e0000000a_k']['pres']['MIN'] ?? 0) === 2000 && ($v['e0000000a_k']['pres']['MAX'] ?? 0) === 6536, 'Licht RGB+Farbtemperatur: Helligkeit, Farbe, Kelvin 2000–6536');
+pruefe(isset($v['e0000000b']) && !isset($v['e0000000b_h']), 'Licht nur an/aus: keine Helligkeit');
+pruefe(($v['e0000000c']['pres']['PRESENTATION'] ?? '') === VARIABLE_PRESENTATION_SLIDER && isset($v['e0000000c_s'], $v['e0000000c_z']), 'Rollladen: Position, Steuerung, Bewegung');
+pruefe(($v['e0000000d']['typ'] ?? -1) === VARIABLETYPE_BOOLEAN, 'Ventil ohne Position: offen/geschlossen');
+pruefe(isset($v['e00000010_m'], $v['e00000010'], $v['e00000010_t'], $v['e00000010_a']), 'Klima: Betriebsart, Soll, Ist, Tätigkeit');
+pruefe(count(json_decode($v['e00000010_m']['pres']['OPTIONS'], true)) === 3, 'Klima: nur unterstützte Betriebsarten');
+
+// Zustände
+pruefe($v['e00000001']['wert'] === 21.5 && $v['e00000005']['wert'] === true && $v['e00000008']['wert'] === 'Komfort', 'Zustände: Sensor gerundet, Schalter, Auswahl');
+pruefe($v['e0000000a_f']['wert'] === 0xFF8000 && $v['e0000000a_h']['wert'] === 60 && $v['e0000000a_k']['wert'] === 4000, 'Zustände: Lichtfarbe, Helligkeit, Kelvin');
+pruefe($v['e0000000f']['wert'] === true && $v['e0000000f_z']['wert'] === 'Blockiert', 'Schloss: blockiert ändert „verriegelt" nicht');
+pruefe($v['e00000010_t']['wert'] === 20.3 && $v['e00000010_a']['wert'] === 'Heizt', 'Klima: Ist-Temperatur und Tätigkeit');
+
+// RequestAction → Befehl, Variable folgt der Rückmeldung
+$sim->empfangen = [];
+$sim->daten = [];
+geraet()->RequestAction('e00000005', false);
+pumpen();
+pruefe($sim->empfangen === [33] && bin2hex($sim->daten[0]) === $fe['befehle'][1]['daten'], 'Schalter aus: SwitchCommandRequest wie api_pb2');
+pruefe(zustand()['v']['e00000005']['wert'] === false, 'Schalter folgt der Rückmeldung des Geräts');
+$sim->empfangen = [];
+geraet()->RequestAction('e00000006', 0);
+pruefe($sim->empfangen === [62] && zustand()['v']['e00000006']['wert'] === 0, 'Knopf: ButtonCommandRequest, Wert sofort');
+$fehler = function (string $ident, $wert): string {
+    try {
+        geraet()->RequestAction($ident, $wert);
+        return '';
+    } catch (Exception $e) {
+        return $e->getMessage();
+    }
+};
+pruefe(str_contains($fehler('e000000ff', 1), 'Unbekannte Variable'), 'unbekannte Variable → Fehlermeldung');
+pruefe(str_contains($fehler('e00000008', 'Turbo'), 'keine Option'), 'ungültige Auswahl → Fehlermeldung');
+pruefe(str_contains($fehler('e00000007', 99.0), 'außerhalb'), 'Zahl außerhalb der Grenzen → Fehlermeldung');
+pruefe(str_contains($fehler('e00000001', 3), 'nicht schalten'), 'Sensor lässt sich nicht schalten');
+
+// Neu verbinden: dieselben Entitäten → keine Darstellung neu schreiben (kein Update-Sturm)
+$GLOBALS['MAINTAIN'] = [];
+geraet()->Neuverbinden();
+pumpen();
+pruefe(($GLOBALS['MAINTAIN'] ?? []) === [] && zustand()['status'] === 102, 'zweite Verbindung: keine Variable neu geschrieben');
 
 $GLOBALS['ANTWORT'][] = ESPHomeHubProtokoll::klartextRahmen(7, '');
 pumpen();
@@ -338,13 +443,13 @@ $GLOBALS['Z'][10000]['a']['Verbindung'] = json_encode(['zustand' => 'getrennt', 
 $sim->empfangen = [];
 geraet()->Wache();
 pumpen();
-pruefe($sim->empfangen === [1, 9] && zustand()['v']['Verbunden']['wert'] === true, 'Wache verbindet nach Trennung neu');
+pruefe($sim->empfangen === [1, 9, 11, 20] && zustand()['v']['Verbunden']['wert'] === true, 'Wache verbindet nach Trennung neu');
 
 $GLOBALS['Z'][10000]['b']['LetzterEmpfang'] = (string)(time() - 200);
 $sim->empfangen = [];
 geraet()->Wache();
 pumpen();
-pruefe($sim->empfangen === [1, 9], 'Wache verbindet nach 150 s Stille neu');
+pruefe($sim->empfangen === [1, 9, 11, 20], 'Wache verbindet nach 150 s Stille neu');
 pruefe(count(array_filter($GLOBALS['LOG'], fn ($l) => str_contains($l[1], 'Keine Antwort'))) === 1, 'Stille wird protokolliert');
 
 // Gerät antwortet verschlüsselt, obwohl kein Schlüssel eingetragen ist
@@ -384,7 +489,7 @@ geraet()->Wache();
 pumpen();
 pruefe(($GLOBALS['ANGELEGT'] ?? 0) === 1 && $GLOBALS['VERBUNDEN_MIT'] === 20000, 'fehlender Client Socket wird angelegt und verbunden');
 pruefe($GLOBALS['SOCKET']['name'] === 'ESPHome-Verbindung (Flur)', 'namenloser Socket wird benannt');
-pruefe($sim->empfangen === [1, 9] && zustand()['status'] === 102, 'danach verbunden');
+pruefe($sim->empfangen === [1, 9, 11, 20] && zustand()['status'] === 102, 'danach verbunden');
 geraet()->Wache();
 pruefe(($GLOBALS['ANGELEGT'] ?? 0) === 1, 'vorhandener Socket: kein zweiter');
 
@@ -414,12 +519,30 @@ foreach (glob($ROOT . '/{libs,ESPHomeHub*}/*.php', GLOB_BRACE) as $datei) {
 }
 pruefe(!str_contains($alle, 'IPS_LogMessage('), 'kein IPS_LogMessage');
 pruefe(preg_match('/public function [A-Z]\w*\([^)]*=/', $alle) === 0, 'keine Standardwerte an öffentlichen Methoden');
+// SUITE.md Stolperstein 9: erlaubte OPTIONS-Schlüssel je Darstellung, Aufzählung nur mit Aktion,
+// Wertanzeige-OPTIONS nur an Bool/String.
 foreach (zustand()['v'] as $ident => $var) {
-    foreach (json_decode($var['pres']['OPTIONS'] ?? '[]', true) as $opt) {
-        $erlaubt = ['Value', 'Caption', 'IconActive', 'IconValue', 'ColorActive', 'ColorValue'];
-        pruefe(array_diff(array_keys($opt), $erlaubt) === [], "Wertanzeige-OPTIONS $ident nur erlaubte Schlüssel");
+    $art = $var['pres']['PRESENTATION'] ?? '';
+    $erlaubt = $art === VARIABLE_PRESENTATION_ENUMERATION
+        ? ['Value', 'Caption', 'IconActive', 'IconValue', 'Color']
+        : ['Value', 'Caption', 'IconActive', 'IconValue', 'ColorActive', 'ColorValue'];
+    $optionen = json_decode($var['pres']['OPTIONS'] ?? '[]', true);
+    $falsch = array_filter($optionen, fn ($o) => array_diff(array_keys($o), $erlaubt) !== [] || array_diff($erlaubt, array_keys($o)) !== []);
+    pruefe($falsch === [], "OPTIONS $ident: genau die erlaubten Schlüssel");
+    if ($art === VARIABLE_PRESENTATION_ENUMERATION) {
+        pruefe($var['aktion'] ?? false, "Aufzählung $ident hat eine Aktion");
     }
-    pruefe(!isset($var['pres']['OPTIONS']) || $var['typ'] === VARIABLETYPE_BOOLEAN || $var['typ'] === 3, "OPTIONS nur an Bool/String ($ident)");
+    if ($art === VARIABLE_PRESENTATION_VALUE_PRESENTATION && $optionen !== []) {
+        pruefe(in_array($var['typ'], [VARIABLETYPE_BOOLEAN, VARIABLETYPE_STRING], true), "Wertanzeige-OPTIONS nur an Bool/String ($ident)");
+    }
+    if (in_array($art, [VARIABLE_PRESENTATION_SWITCH, VARIABLE_PRESENTATION_SLIDER, VARIABLE_PRESENTATION_VALUE_INPUT, VARIABLE_PRESENTATION_COLOR], true)) {
+        pruefe($var['aktion'] ?? false, "eingabefähige Darstellung $ident hat eine Aktion");
+    }
+    if ($art === VARIABLE_PRESENTATION_SLIDER) {
+        $int = $var['typ'] === VARIABLETYPE_INTEGER;
+        pruefe(is_int($var['pres']['MIN']) === $int && is_int($var['pres']['MAX']) === $int && is_int($var['pres']['STEP_SIZE']) === $int, "Schieberegler $ident: MIN/MAX/STEP passend zum Typ (SUITE.md 18)");
+    }
+    pruefe(!isset($var['pres']['DIGITS']) || $art !== VARIABLE_PRESENTATION_VALUE_INPUT, "VALUE_INPUT ohne DIGITS ($ident)");
 }
 $lib = json_decode((string)file_get_contents($ROOT . '/library.json'), true);
 $mod = json_decode((string)file_get_contents($ROOT . '/ESPHomeHubGeraet/module.json'), true);
@@ -479,6 +602,40 @@ if ($live) {
         $wie = "$host:$port " . ($key === '' ? 'ohne Schlüssel' : 'mit Schlüssel');
         pruefe(zustand()['status'] === 102, "$wie: verbunden (Status " . zustand()['status'] . ')');
         echo "    Gerät: " . ($info['anzeigename'] ?? '?') . ' · ESPHome ' . ($info['version'] ?? '?') . ' · ' . ($info['modell'] ?? '?') . "\n";
+        // Jede schaltbare Variable einmal setzen; der Wert muss vom Gerät zurückkommen.
+        $GLOBALS['Z'][10000]['v'] = array_intersect_key(zustand()['v'], ['Verbunden' => 1]) + zustand()['v'];
+        $probe = [
+            'switch/' => true, 'number/' => 23.5, 'select/' => 'Komfort', 'text/' => 'Grüße aus Symcon', 'light/' => true,
+            'light/h' => 40, 'light/f' => 0x00FF00, 'fan/' => true, 'fan/g' => 2, 'cover/' => 30, 'cover/s' => 0, 'valve/s' => 0,
+            'lock/' => true, 'climate/m' => 3, 'climate/u' => 20.5, 'climate/' => 20.5, 'button/' => 0,
+        ];
+        $ents = json_decode(geraet()->GetEntities(), true);
+        echo '    ' . count($ents) . ' Entitäten: ' . implode(', ', array_map(fn ($e) => $e['typ'] . ' „' . $e['name'] . '"', $ents)) . "\n";
+        foreach ($ents as $e) {
+            foreach (ESPHomeHubEntitaeten::variablen($e, 'Gerät') as $var) {
+                $teil = (string)(ESPHomeHubEntitaeten::identLesen($var['ident'])[1] ?? '');
+                $wert = $probe[$e['typ'] . '/' . $teil] ?? null;
+                if (!$var['aktion'] || $wert === null) {
+                    continue;
+                }
+                try {
+                    geraet()->RequestAction($var['ident'], $wert);
+                } catch (Exception $ex) {
+                    pruefe(false, $var['name'] . ': ' . $ex->getMessage());
+                    continue;
+                }
+                $t->pumpen(1.2);
+                $ist = zustand()['v'][$var['ident']]['wert'] ?? null;
+                $ok = is_float($wert) ? abs((float)$ist - $wert) < 0.01 : $ist === $wert;
+                // Rollladen „Öffnen": Steuerung zeigt den Befehl, die Position fährt auf 100.
+                pruefe($ok, "$wie: {$var['name']} = " . json_encode($wert, JSON_UNESCAPED_UNICODE) . ' → ' . json_encode($ist, JSON_UNESCAPED_UNICODE));
+            }
+        }
+        $werte = [];
+        foreach (zustand()['v'] as $ident => $var) {
+            $werte[] = $ident . '=' . json_encode($var['wert'], JSON_UNESCAPED_UNICODE);
+        }
+        echo '    Werte: ' . implode(' ', $werte) . "\n";
         if ($key !== '') {
             $GLOBALS['Z'][10000]['p']['Schluessel'] = base64_encode(random_bytes(32));
             geraet()->ApplyChanges();

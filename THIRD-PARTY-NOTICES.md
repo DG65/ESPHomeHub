@@ -8,7 +8,8 @@ bzw. als Prüfreferenz:
 
 Nachrichtennummern und Feldnummern der ESPHome Native API (`api.proto`) sowie der Ablauf von
 Rahmen und Verschlüsselung (`_frame_helper/noise.py`, `plain_text.py`) sind nach
-https://github.com/esphome/aioesphomeapi in PHP nachgebaut.
+https://github.com/esphome/aioesphomeapi in PHP nachgebaut. Der Prüfstand (`.tools/fixture-entitaeten.py`) erzeugt mit den
+Protobuf-Klassen der Bibliothek (`api_pb2`) Referenznachrichten; die Bibliothek ist nicht Teil des Moduls.
 
 ```
 MIT License

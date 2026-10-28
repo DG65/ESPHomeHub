@@ -1,7 +1,7 @@
 # ESPHomeHub
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Modul Version](https://img.shields.io/badge/Modul-0.1.1-informational)
+![Modul Version](https://img.shields.io/badge/Modul-0.2.0-informational)
 ![Symcon Version](https://img.shields.io/badge/Symcon-9.0%2B-informational)
 ![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange)
 [![Check Style](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml/badge.svg)](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml)
@@ -17,15 +17,15 @@ ein Licht oder einen Bluetooth-Proxy. Bisher ging das in Symcon nur über MQTT a
 ESPHomeHub spricht das Gerät so an wie Home Assistant: eine TCP-Verbindung je Gerät, das Gerät
 beschreibt sich selbst, Änderungen kommen sofort.
 
-**Stand 0.1.0 (erste Stufe):** Verbindung mit Verschlüsselung, Lebenszeichen, Wiederverbinden
-und Geräteinfo. Sensoren, Schalter, Lichter usw. als Variablen folgen in der nächsten Version,
-danach ein Konfigurator, der die Geräte im Netz findet.
+**Stand 0.2.0:** Verbindung mit Verschlüsselung, Lebenszeichen, Wiederverbinden, Geräteinfo und
+alle gängigen Entitäten als Variablen. Als Nächstes kommt ein Konfigurator, der die Geräte im
+Netz findet; der Bluetooth-Proxy wird ein eigenes Modul.
 
 ## Aufbau
 
 | Instanz | Aufgabe |
 |---|---|
-| **ESPHome-Gerät** | ein ESPHome-Gerät im Netz: Verbindung, Verschlüsselung, Lebenszeichen, Geräteinfo |
+| **ESPHome-Gerät** | ein ESPHome-Gerät im Netz: Verbindung, Verschlüsselung, Lebenszeichen, Geräteinfo, Entitäten als Variablen |
 | Client Socket | darunter, legt Symcon beim Anlegen mit an (TCP zum Gerät) |
 
 ## Einrichtung
@@ -44,6 +44,43 @@ danach ein Konfigurator, der die Geräte im Netz findet.
 
 Läuft Home Assistant parallel, darf das Gerät beide Verbindungen gleichzeitig halten.
 
+## Entitäten
+
+Das Gerät beschreibt nach jeder Verbindung selbst, was es kann. Daraus entstehen Variablen unter
+der Instanz, mit passender Darstellung (Einheit, Nachkommastellen, Grenzen, Klartext):
+
+| ESPHome | Variablen |
+|---|---|
+| sensor | Zahl mit Einheit |
+| binary_sensor | Ja/Nein mit Klartext je Geräteklasse (Offen/Geschlossen, Bewegung, …) |
+| text_sensor, event | Text (beim Ereignis: das zuletzt ausgelöste) |
+| switch | Schalter |
+| button | Knopf „Auslösen" |
+| number | Schieberegler bzw. Eingabefeld mit Grenzen |
+| select | Auswahl mit den Optionen des Geräts |
+| text | Eingabefeld |
+| light | An/Aus, Helligkeit, Farbe, Farbtemperatur (je nach Licht) |
+| cover, valve | Position in % (sonst Offen/Geschlossen), Öffnen/Stopp/Schließen, Bewegung |
+| fan | An/Aus, Stufe |
+| lock | Verriegelt, Öffnen (falls unterstützt), Zustand |
+| climate | Betriebsart, Solltemperatur (bzw. unten/oben), Ist-Temperatur, Tätigkeit |
+
+Noch nicht unterstützt (im Panel „Entitäten" genannt): Kamera, Medienplayer, Alarmanlage, Sirene,
+Datum/Uhrzeit, Update, Warmwasserbereiter, Infrarot/Funk.
+
+Schaltbare Variablen lassen sich in der Visualisierung bedienen oder per Skript setzen. Die
+Variable übernimmt den Wert erst, wenn das Gerät ihn bestätigt; bei ungültigem Wert oder
+getrennter Verbindung gibt es eine Fehlermeldung.
+
+```php
+RequestAction($variablenID, true);               // z. B. Variable „Relais" einschalten
+IPS_RequestAction($id, 'e6d53a046_h', 40);       // Licht auf 40 % (Ident aus dem Panel „Entitäten")
+```
+
+Der Ident einer Variable ist der `key` der Entität (`e` + 8 Hex-Zeichen, Teilvariablen mit Endung).
+Er bleibt gleich, solange die `id` in der Geräte-YAML gleich bleibt. Entfernt man eine Entität,
+bleibt ihre Variable samt Archiv stehen und kann von Hand gelöscht werden.
+
 ## Verhalten
 
 - Das Gerät schickt alle 60 Sekunden ein Lebenszeichen, ESPHomeHub antwortet.
@@ -54,6 +91,7 @@ Läuft Home Assistant parallel, darf das Gerät beide Verbindungen gleichzeitig 
   versucht es erst nach einer Änderung wieder.
 - Die Variable **Verbunden** eignet sich als Auslöser, z. B. für eine Meldung, wenn ein Gerät
   ausfällt.
+- Fragt das Gerät nach der Uhrzeit (`time: platform: homeassistant`), antwortet ESPHomeHub.
 
 | Status | Bedeutung |
 |---|---|
@@ -65,6 +103,7 @@ Läuft Home Assistant parallel, darf das Gerät beide Verbindungen gleichzeitig 
 
 ```php
 ESPH_GetDeviceInfo($id);   // JSON: name, mac, version, modell, anzeigename, hersteller, …
+ESPH_GetEntities($id);     // JSON: alle Entitäten mit Typ, Name, Fähigkeiten; Schlüssel = Ident
 ESPH_Neuverbinden($id);
 ```
 
@@ -83,7 +122,9 @@ Als [GitHub-Issue](https://github.com/DG65/ESPHomeHub/issues).
 
 - Protokoll nach [aioesphomeapi](https://github.com/esphome/aioesphomeapi) (MIT), der
   Bibliothek, mit der Home Assistant ESPHome-Geräte anspricht. Nachrichtennummern aus deren
-  `api.proto`, Ablauf der Verschlüsselung aus `_frame_helper/noise.py`.
+  `api.proto`, Ablauf der Verschlüsselung aus `_frame_helper/noise.py`. Der Prüfstand vergleicht
+  jede Entitätsbeschreibung, jeden Zustand und jeden Befehl mit den Protobuf-Klassen dieser
+  Bibliothek.
 - Verschlüsselung `Noise_NNpsk0_25519_ChaChaPoly_SHA256` nach der
   [Noise-Spezifikation](https://noiseprotocol.org/noise.html), in PHP mit sodium nachgebaut
   und byte-genau gegen die Python-Bibliothek

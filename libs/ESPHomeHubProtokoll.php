@@ -25,6 +25,11 @@ final class ESPHomeHubProtokoll
     public const PING_RESPONSE = 8;
     public const DEVICE_INFO_REQUEST = 9;
     public const DEVICE_INFO_RESPONSE = 10;
+    public const LIST_ENTITIES_REQUEST = 11;
+    public const LIST_ENTITIES_DONE = 19;
+    public const SUBSCRIBE_STATES_REQUEST = 20;
+    public const GET_TIME_REQUEST = 36;
+    public const GET_TIME_RESPONSE = 37;
 
     // API-Version, die wir anbieten (aioesphomeapi 2026.10: 1.19 — Gerät antwortet mit seiner).
     public const API_MAJOR = 1;
@@ -85,9 +90,10 @@ final class ESPHomeHubProtokoll
         return self::varint(($feld << 3) | 5) . pack('V', $wert);
     }
 
+    /** Wie Protobuf (proto3): 0.0 wird weggelassen, der Empfänger liest dann ohnehin 0. */
     public static function feldFloat(int $feld, float $wert): string
     {
-        return self::varint(($feld << 3) | 5) . pack('g', $wert);
+        return $wert == 0.0 ? '' : self::varint(($feld << 3) | 5) . pack('g', $wert);
     }
 
     // ------------------------------------------------------------------ Protobuf lesen

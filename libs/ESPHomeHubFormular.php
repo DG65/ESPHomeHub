@@ -24,6 +24,11 @@ trait ESPHomeHubFormular
         '0.1.1' => [
             '• Fehlt der Client Socket, legt das ESPHome-Gerät ihn selbst an und verbindet ihn.',
         ],
+        '0.2.0' => [
+            '• 🧩 Sensoren, Schalter, Lichter, Rollläden, Lüfter, Schlösser, Klima und mehr werden automatisch zu Variablen — schaltbare direkt bedienbar.',
+            '• Die Variable übernimmt einen neuen Wert erst, wenn das Gerät ihn bestätigt.',
+            '• Panel „Entitäten" zeigt alles, was das Gerät meldet, mit aktuellem Wert.',
+        ],
     ];
 
     private static $ESPHOMEHUB_REPO_URL     = 'https://github.com/DG65/ESPHomeHub';

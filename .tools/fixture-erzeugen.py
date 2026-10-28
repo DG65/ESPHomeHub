@@ -69,9 +69,16 @@ c_hello = rahmen(i.encrypt(inhalt(1, hello_req)))
 s_hello = rahmen(r.encrypt(inhalt(2, hello_resp)))
 c_info = rahmen(i.encrypt(inhalt(9, b"")))
 s_info = rahmen(r.encrypt(inhalt(10, info)))
+c_list = rahmen(i.encrypt(inhalt(11, b"")))
+fix = lambda f, v: varint(f << 3 | 5) + v.to_bytes(4, "little")
+s_liste = (rahmen(r.encrypt(inhalt(16, fix(2, 0x44332211) + text(3, "Temperatur") + text(6, "°C") + zahl(7, 1))))
+           + rahmen(r.encrypt(inhalt(17, fix(2, 0x55) + text(3, "Relais"))))
+           + rahmen(r.encrypt(inhalt(19, b""))))
+c_abo = rahmen(i.encrypt(inhalt(20, b"")))
+s_zustand = rahmen(r.encrypt(inhalt(25, b"\x0d\x11\x22\x33\x44\x15\x00\x00\xb0\x41")))
 s_ping = rahmen(r.encrypt(inhalt(7, b"")))
 c_pong = rahmen(i.encrypt(inhalt(8, b"")))
-s_unbekannt = rahmen(r.encrypt(inhalt(25, b"\x0d\x11\x22\x33\x44\x15\x00\x00\xb0\x41")))
+s_unbekannt = rahmen(r.encrypt(inhalt(250, b"\x08\x01")))
 
 out = {
     "quelle": "noiseprotocol " + __import__("noise").__version__ if hasattr(__import__("noise"), "__version__") else "noiseprotocol",
@@ -80,6 +87,7 @@ out = {
     "client_start": client_out.hex(), "server_hello": server_hello.hex(), "server_handshake": server_hs.hex(),
     "client_hello": c_hello.hex(), "server_hello_response": s_hello.hex(),
     "client_device_info_request": c_info.hex(), "server_device_info": s_info.hex(),
+    "client_list_entities": c_list.hex(), "server_liste": s_liste.hex(), "client_abo": c_abo.hex(), "server_zustand": s_zustand.hex(),
     "server_ping": s_ping.hex(), "client_pong": c_pong.hex(), "server_unbekannt": s_unbekannt.hex(),
     "handshake_hash": i.get_handshake_hash().hex(),
 }

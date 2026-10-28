@@ -14,7 +14,10 @@ require_once __DIR__ . '/ESPHomeHubProtokoll.php';
 // → Handshake → HelloRequest → HelloResponse → DeviceInfoRequest → bereit.
 // PingRequest des Geräts (alle 60 s) beantwortet die Sitzung selbst.
 //
-// Ereignisse: ['hello', info], ['geraet', info], ['ping'], ['getrennt'],
+// Nach DeviceInfo fordert die Sitzung die Entitäten an, nach ListEntitiesDone
+// abonniert sie die Zustände; GetTimeRequest beantwortet sie mit der Uhrzeit.
+//
+// Ereignisse: ['hello', info], ['geraet', info], ['entitaetenFertig'], ['ping'], ['getrennt'],
 //   ['nachricht', typ, daten] für alles, was die Sitzung nicht selbst kennt,
 //   ['fehler', art, text] mit art = schluessel | unverschluesselt |
 //   verschluesselt | protokoll. Nach einem Fehler ist die Sitzung beendet.
@@ -168,6 +171,16 @@ final class ESPHomeHubSitzung
             case ESPHomeHubProtokoll::DEVICE_INFO_RESPONSE:
                 $this->phase = self::BEREIT;
                 $ereignisse[] = ['geraet', ESPHomeHubProtokoll::deviceInfo($daten)];
+                $raus .= $this->senden(ESPHomeHubProtokoll::LIST_ENTITIES_REQUEST);
+                return;
+            case ESPHomeHubProtokoll::LIST_ENTITIES_DONE:
+                // Erst nach der vollständigen Liste abonnieren: Zustände ohne bekannte Entität wären wertlos.
+                $raus .= $this->senden(ESPHomeHubProtokoll::SUBSCRIBE_STATES_REQUEST);
+                $ereignisse[] = ['entitaetenFertig'];
+                return;
+            case ESPHomeHubProtokoll::GET_TIME_REQUEST:
+                // Geräte mit „time: platform: homeassistant" fragen den API-Client nach der Uhrzeit.
+                $raus .= $this->senden(ESPHomeHubProtokoll::GET_TIME_RESPONSE, ESPHomeHubProtokoll::feldFixed32(1, time()));
                 return;
             case ESPHomeHubProtokoll::PING_REQUEST:
                 $raus .= $this->senden(ESPHomeHubProtokoll::PING_RESPONSE);

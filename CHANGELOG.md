@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 (28.10.2026)
+
+- Entitäten werden zu Variablen: Sensor, Binärsensor, Textsensor, Schalter, Knopf, Zahl, Auswahl, Text, Licht (an/aus, Helligkeit, Farbe, Farbtemperatur), Abdeckung/Rollladen und Ventil (Position, Öffnen/Stopp/Schließen), Lüfter (Stufe), Schloss (verriegeln, öffnen), Klima (Betriebsart, Solltemperatur, Ist-Temperatur, Tätigkeit), Ereignis.
+- Schaltbare Variablen über die Visualisierung oder `RequestAction`; die Variable übernimmt den Wert mit der Rückmeldung des Geräts. Klare Fehlermeldung bei ungültigem Wert oder getrennter Verbindung.
+- Darstellungen passend zur Entität (Einheit, Nachkommastellen, Grenzen, Klartext je device_class); Zeitabfrage des Geräts wird beantwortet.
+- Panel „Entitäten" mit allen Entitäten und aktuellen Werten; nicht unterstützte Typen werden genannt.
+
 ## 0.1.1 (28.10.2026)
 
 - Fehlt der Client Socket (z. B. Instanz per Skript angelegt), legt das Gerät ihn nach spätestens 30 s selbst an, benennt und verbindet ihn.

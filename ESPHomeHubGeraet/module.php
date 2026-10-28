@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../libs/ESPHomeHubSitzung.php';
+require_once __DIR__ . '/../libs/ESPHomeHubEntitaeten.php';
 require_once __DIR__ . '/../libs/ESPHomeHubFormular.php';
 
 // ===========================================================================
@@ -18,7 +19,11 @@ require_once __DIR__ . '/../libs/ESPHomeHubFormular.php';
 // Ohne verbundenen Client startet ein ESPHome-Gerät nach reboot_timeout
 // (Standard 15 min) neu — deshalb verbindet die Wache zügig wieder.
 //
-// Stufe 1: Verbindung, Geräteinfo, Lebenszeichen. Entitäten folgen in Stufe 2.
+// Entitäten (Sensoren, Schalter, Lichter …) beschreibt das Gerät nach jeder
+// Verbindung selbst; daraus entstehen Variablen mit passender Darstellung.
+// Zustände kommen per Abo, Schalten über RequestAction → *CommandRequest. Die
+// Variable übernimmt den neuen Wert erst mit der Rückmeldung des Geräts.
+// Verschwundene Entitäten behalten ihre Variable (Archiv), sie wird nicht gelöscht.
 // ===========================================================================
 
 class ESPHomeHubGeraet extends IPSModule
@@ -49,6 +54,8 @@ class ESPHomeHubGeraet extends IPSModule
 
         $this->RegisterAttributeString('Geraet', '{}');
         $this->RegisterAttributeString('Verbindung', '{}');
+        $this->RegisterAttributeString('Entitaeten', '{}');
+        $this->RegisterAttributeString('NichtUnterstuetzt', '[]');
         $this->RegisterAttributeBoolean('Gesperrt', false);
         $this->RegisterAttributeInteger('Eltern', 0);
         $this->registerFormAttributes();
@@ -177,6 +184,39 @@ class ESPHomeHubGeraet extends IPSModule
         return $this->ReadAttributeString('Geraet');
     }
 
+    /** Entitäten des Geräts als JSON, Schlüssel = Variablen-Ident der Hauptvariable. */
+    public function GetEntities(): string
+    {
+        $out = [];
+        foreach ($this->entitaeten() as $e) {
+            $out[ESPHomeHubEntitaeten::ident((int)$e['key'])] = $e;
+        }
+        return (string)json_encode($out);
+    }
+
+    /** Variable schalten: Wert an das Gerät senden; die Variable folgt der Rückmeldung. */
+    public function RequestAction($Ident, $Value)
+    {
+        $ziel = ESPHomeHubEntitaeten::identLesen((string)$Ident);
+        $e = $ziel === null ? null : ($this->entitaeten()[$ziel[0]] ?? null);
+        if ($e === null) {
+            throw new Exception('Unbekannte Variable ' . $Ident . ' — das Gerät kennt diese Entität nicht (mehr).');
+        }
+        try {
+            [$typ, $daten, $sofort] = ESPHomeHubEntitaeten::befehl($e, $ziel[1], $Value);
+        } catch (InvalidArgumentException $ex) {
+            throw new Exception($ex->getMessage());
+        }
+        if (!$this->nachrichtSenden($typ, $daten)) {
+            throw new Exception('„' . ($e['name'] ?: IPS_GetName($this->InstanceID)) . '" nicht gesendet: Gerät ist nicht verbunden.');
+        }
+        $this->SendDebug('Befehl', $Ident . ' = ' . json_encode($Value), 0);
+        // Knöpfe und Fahrbefehle haben keinen Zustand, den das Gerät zurückmeldet.
+        if ($sofort !== null) {
+            $this->wertSetzen((string)$Ident, $sofort);
+        }
+    }
+
     // ------------------------------------------------------------------ Daten vom Client Socket
 
     public function ReceiveData($JSONString)
@@ -240,8 +280,11 @@ class ESPHomeHubGeraet extends IPSModule
                 $this->verbundenSetzen(false);
                 $this->verbindungMerken(['zustand' => 'getrennt', 'text' => 'Gerät hat die Verbindung beendet (Neustart oder Update).']);
                 return;
+            case 'entitaetenFertig':
+                $this->entitaetenUebernehmen();
+                return;
             case 'nachricht':
-                $this->SendDebug('Nachricht', 'Typ ' . $e[1] . ', ' . strlen($e[2]) . ' Byte (noch nicht ausgewertet)', 0);
+                $this->nachricht((int)$e[1], (string)$e[2]);
                 return;
             case 'fehler':
                 $this->fehler((string)$e[1], (string)$e[2], $server);
@@ -437,6 +480,136 @@ class ESPHomeHubGeraet extends IPSModule
         $this->WriteAttributeString('Verbindung', (string)json_encode(array_merge($v, $neu)));
     }
 
+    // ------------------------------------------------------------------ Entitäten
+
+    private ?array $entitaetenCache = null;
+
+    private function entitaeten(): array
+    {
+        if ($this->entitaetenCache === null) {
+            $roh = json_decode($this->ReadAttributeString('Entitaeten'), true) ?: [];
+            $this->entitaetenCache = [];
+            foreach ($roh as $e) {
+                $this->entitaetenCache[(int)$e['key']] = $e;
+            }
+        }
+        return $this->entitaetenCache;
+    }
+
+    private function nachricht(int $typ, string $daten): void
+    {
+        if (ESPHomeHubEntitaeten::istListe($typ)) {
+            $neu = json_decode($this->GetBuffer('EntitaetenNeu'), true) ?: ['liste' => [], 'fehlt' => []];
+            $e = ESPHomeHubEntitaeten::beschreiben($typ, $daten);
+            if ($e === null) {
+                $neu['fehlt'][] = ESPHomeHubEntitaeten::NICHT_UNTERSTUETZT[$typ] ?? ('Typ ' . $typ);
+            } else {
+                $neu['liste'][] = $e;
+            }
+            $this->SetBuffer('EntitaetenNeu', (string)json_encode($neu));
+            return;
+        }
+        $art = ESPHomeHubEntitaeten::zustandsTyp($typ);
+        if ($art === null) {
+            $this->SendDebug('Nachricht', 'Typ ' . $typ . ', ' . strlen($daten) . ' Byte (nicht ausgewertet)', 0);
+            return;
+        }
+        try {
+            $key = ESPHomeHubProtokoll::fixed32(ESPHomeHubProtokoll::zerlegen($daten), 1);
+            $e = $this->entitaeten()[$key] ?? null;
+            if ($e === null || $e['typ'] !== $art) {
+                return;
+            }
+            foreach (ESPHomeHubEntitaeten::zustand($typ, $daten, $e) as $ident => $wert) {
+                $this->wertSetzen($ident, $wert);
+            }
+        } catch (RuntimeException $ex) {
+            $this->SendDebug('Zustand', 'nicht lesbar: ' . $ex->getMessage(), 0);
+        }
+    }
+
+    /** Vollständige Liste da: merken und Variablen anlegen bzw. anpassen. */
+    private function entitaetenUebernehmen(): void
+    {
+        $neu = json_decode($this->GetBuffer('EntitaetenNeu'), true) ?: ['liste' => [], 'fehlt' => []];
+        $this->SetBuffer('EntitaetenNeu', '');
+        $this->WriteAttributeString('Entitaeten', (string)json_encode($neu['liste']));
+        $this->WriteAttributeString('NichtUnterstuetzt', (string)json_encode(array_values(array_unique($neu['fehlt']))));
+        $this->entitaetenCache = null;
+        $g = json_decode($this->ReadAttributeString('Geraet'), true) ?: [];
+        $geraet = (string)(($g['anzeigename'] ?? '') ?: ($g['name'] ?? IPS_GetName($this->InstanceID)));
+        $pos = 10;
+        $anzahl = 0;
+        foreach ($neu['liste'] as $e) {
+            foreach (ESPHomeHubEntitaeten::variablen($e, $geraet) as $i => $v) {
+                $this->variableSicherstellen($v, $pos + $i);
+                $anzahl++;
+            }
+            $pos += 10;
+        }
+        $this->SendDebug('Entitäten', count($neu['liste']) . ' Entitäten, ' . $anzahl . ' Variablen' . ($neu['fehlt'] ? ', nicht unterstützt: ' . implode(', ', $neu['fehlt']) : ''), 0);
+    }
+
+    /**
+     * Variable anlegen oder anpassen. Darstellung nur bei Abweichung neu schreiben:
+     * MaintainVariable setzt sie sonst bei jedem Aufruf neu (Update-Sturm, ips-module-pitfalls 9).
+     * Position nur bei Neuanlage (SUITE.md 9m), Name eines Bestands nie überschreiben.
+     */
+    private function variableSicherstellen(array $v, int $pos): void
+    {
+        $id = @$this->GetIDForIdent($v['ident']);
+        $anders = $id === false;
+        if (!$anders) {
+            $ist = IPS_GetVariablePresentation($id);
+            foreach ($v['pres'] as $k => $wert) {
+                if (!array_key_exists($k, $ist) || json_encode($ist[$k]) !== json_encode($wert)) {
+                    $anders = true;
+                    break;
+                }
+            }
+            $anders = $anders || IPS_GetVariable($id)['VariableType'] !== $v['typ'];
+        }
+        if ($anders) {
+            $this->MaintainVariable($v['ident'], $v['name'], $v['typ'], $v['pres'], $id === false ? $pos : 0, true);
+            if ($id !== false) {
+                IPS_SetPosition($this->GetIDForIdent($v['ident']), IPS_GetObject($id)['ObjectPosition']);
+            }
+        }
+        if ($v['aktion']) {
+            $this->EnableAction($v['ident']);
+        }
+    }
+
+    private function wertSetzen(string $ident, $wert): void
+    {
+        if (!@$this->GetIDForIdent($ident)) {
+            return;
+        }
+        if ($this->GetValue($ident) !== $wert) {
+            $this->SetValue($ident, $wert);
+        }
+    }
+
+    /** Eine Nachricht in der laufenden Sitzung senden (Nonce-Zähler unter Semaphore fortschreiben). */
+    private function nachrichtSenden(int $typ, string $daten): bool
+    {
+        if (!$this->sperren()) {
+            return false;
+        }
+        try {
+            $sitzung = ESPHomeHubSitzung::import($this->GetBuffer('Sitzung'));
+            if ($sitzung === null || !$sitzung->bereit() || !$this->HasActiveParent()) {
+                return false;
+            }
+            $bytes = $sitzung->senden($typ, $daten);
+            $this->SetBuffer('Sitzung', $sitzung->export());
+            $this->rohSenden($bytes);
+            return true;
+        } finally {
+            $this->entsperren();
+        }
+    }
+
     private function verbundenSetzen(bool $an): void
     {
         if (@$this->GetIDForIdent('Verbunden') && $this->GetValue('Verbunden') !== $an) {
@@ -465,13 +638,14 @@ class ESPHomeHubGeraet extends IPSModule
             'Das Gerät braucht in seiner YAML den Abschnitt „api:". Seit ESPHome 2026.1 gibt es dort nur noch den Schlüssel unter „encryption: key" (Base64, 44 Zeichen), kein Passwort mehr.',
             'Port ist 6053, solange in der YAML unter „api:" kein anderer steht.',
             'Ohne verbundenen Client startet ein ESPHome-Gerät nach „reboot_timeout" (Standard 15 Minuten) neu. Läuft parallel Home Assistant, darf das Gerät beide Verbindungen gleichzeitig halten.',
-            'Diese Version stellt die Verbindung her und zeigt die Geräteinfo. Sensoren, Schalter und Co. als Variablen folgen in der nächsten Version.',
+            'Jede Entität des Geräts wird zu Variablen unter dieser Instanz, schaltbare mit Aktion. Der Ident ist der key der Entität (e + 8 Hex-Zeichen, Teilvariablen mit Endung wie _h für Helligkeit) und bleibt gleich, solange die id in der YAML gleich bleibt.',
+            'Entfernt man eine Entität aus der YAML, bleibt ihre Variable samt Archiv stehen und kann von Hand gelöscht werden.',
         ];
     }
 
     public function GetConfigurationForm()
     {
-        return $this->esphomehubFormular([$this->formVerbindung(), $this->formGeraet()], [], $this->formStatus());
+        return $this->esphomehubFormular([$this->formVerbindung(), $this->formGeraet(), $this->formEntitaeten()], [], $this->formStatus());
     }
 
     private function formVerbindung(): array
@@ -503,7 +677,7 @@ class ESPHomeHubGeraet extends IPSModule
                 $items[] = ['type' => 'Label', 'caption' => 'Projekt: ' . $g['projekt'] . ' ' . $g['projektVersion']];
             }
             if ((int)($g['bluetoothProxy'] ?? 0) !== 0) {
-                $items[] = ['type' => 'Label', 'caption' => '📡 Das Gerät ist ein Bluetooth-Proxy (wird in einer späteren Version unterstützt).'];
+                $items[] = ['type' => 'Label', 'caption' => '📡 Das Gerät ist ein Bluetooth-Proxy (dafür kommt ein eigenes Modul).'];
             }
             if ((int)($g['webserverPort'] ?? 0) !== 0) {
                 $items[] = ['type' => 'Label', 'caption' => '🌐 Eigene Weboberfläche auf Port ' . $g['webserverPort'] . '.'];
@@ -511,6 +685,40 @@ class ESPHomeHubGeraet extends IPSModule
         }
         $items[] = ['type' => 'Button', 'caption' => '🔄 Neu verbinden', 'onClick' => 'ESPH_Neuverbinden($id);'];
         return ['type' => 'ExpansionPanel', 'expanded' => $this->host() !== '', 'caption' => '📟  Gerät', 'items' => $items];
+    }
+
+    private function formEntitaeten(): array
+    {
+        $zeilen = [];
+        foreach ($this->entitaeten() as $e) {
+            $ident = ESPHomeHubEntitaeten::ident((int)$e['key']);
+            $id = @$this->GetIDForIdent($ident);
+            $zeilen[] = [
+                'typ'   => ESPHomeHubEntitaeten::TYP_NAMEN[$e['typ']] ?? $e['typ'],
+                'name'  => $e['name'] !== '' ? $e['name'] : '(Gerätename)',
+                'wert'  => $id ? GetValueFormatted($id) : '—',
+                'ident' => $ident,
+            ];
+        }
+        $items = [];
+        if (count($zeilen) === 0) {
+            $items[] = ['type' => 'Label', 'caption' => 'ℹ️ Noch keine Entitäten — sie kommen mit der ersten Verbindung.'];
+        } else {
+            $items[] = ['type' => 'Label', 'caption' => '✅ ' . count($zeilen) . ' Entitäten. Die Variablen liegen unter dieser Instanz; schaltbare lassen sich direkt bedienen oder per RequestAction setzen.'];
+            $items[] = ['type' => 'List', 'name' => 'EntitaetenListe', 'rowCount' => min(15, count($zeilen)), 'add' => false, 'delete' => false,
+                'columns' => [
+                    ['caption' => 'Art', 'name' => 'typ', 'width' => '130px'],
+                    ['caption' => 'Name', 'name' => 'name', 'width' => 'auto'],
+                    ['caption' => 'Wert', 'name' => 'wert', 'width' => '160px'],
+                    ['caption' => 'Ident', 'name' => 'ident', 'width' => '130px'],
+                ],
+                'values' => $zeilen];
+        }
+        $fehlt = json_decode($this->ReadAttributeString('NichtUnterstuetzt'), true) ?: [];
+        if (count($fehlt) > 0) {
+            $items[] = ['type' => 'Label', 'caption' => '⚠️ Noch nicht unterstützt und deshalb übergangen: ' . implode(', ', $fehlt) . '.'];
+        }
+        return ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '🧩  Entitäten', 'items' => $items];
     }
 
     private function statuszeile(array $v): string
