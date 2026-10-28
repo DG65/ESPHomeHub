@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2 (28.10.2026)
+
+- Zeitanfrage des Geräts mit Zeitzone und Sommerzeit-Regeln beantwortet (`parsed_timezone`, seit ESPHome 2026.9 nötig). Vorher zeigte ein Gerät die Zeitzone seines Build-Rechners, oft UTC. Funktioniert auch ohne zoneinfo-Dateien (Symcon unter Windows).
+
 ## 0.3.1 (28.10.2026)
 
 - Über eine Hand-Adresse angelegte Geräte bekommen nach dem ersten Verbinden den Anzeigenamen des Geräts statt der IP-Adresse (ein selbst vergebener Name bleibt).

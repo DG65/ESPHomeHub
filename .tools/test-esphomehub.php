@@ -357,6 +357,31 @@ foreach ($fe['befehle'] as $c) {
 $id = ESPHomeHubEntitaeten::ident(0xDEADBEEF, 'h');
 pruefe($id === 'edeadbeef_h' && ESPHomeHubEntitaeten::identLesen($id) === [0xDEADBEEF, 'h'] && ESPHomeHubEntitaeten::identLesen('Verbunden') === null, 'Ident hin und zurück');
 
+// ------------------------------------------------------------------ 3c. Zeitzone gegen aioesphomeapi
+abschnitt('Zeitzone (GetTimeResponse) gegen aioesphomeapi');
+$fz = json_decode((string)file_get_contents(__DIR__ . '/fixture-zeitzone.json'), true);
+foreach ($fz['faelle'] as $f) {
+    $ist = bin2hex(ESPHomeHubZeitzone::getTimeResponse($fz['epoche'], $f['posix']));
+    pruefe($ist === $f['bytes'], 'GetTimeResponse „' . $f['posix'] . '": ' . $ist . ' erwartet ' . $f['bytes']);
+    if ($f['iana'] !== '' && is_file('/usr/share/zoneinfo/' . $f['iana'])) {
+        $p = ESPHomeHubZeitzone::posix($f['iana']);
+        pruefe($p === $f['posix'], 'POSIX aus zoneinfo ' . $f['iana'] . ': ' . $p);
+    }
+    if (in_array($f['iana'], ['Europe/Berlin', 'Europe/London', 'America/New_York', 'Asia/Kolkata', 'America/Sao_Paulo', 'Australia/Lord_Howe', 'Pacific/Chatham'], true)) {
+        $p = ESPHomeHubZeitzone::posixAusPhp($f['iana'], 2026);
+        pruefe($p === $f['posix'], 'POSIX ohne zoneinfo (aus PHP) ' . $f['iana'] . ': ' . $p . ' erwartet ' . $f['posix']);
+    }
+}
+[$s] = ESPHomeHubSitzung::starten(null, 'x');
+$s->empfangen(ESPHomeHubProtokoll::klartextRahmen(2, '') . ESPHomeHubProtokoll::klartextRahmen(10, ''));
+$s->setzeZeitzone('CET-1CEST,M3.5.0,M10.5.0/3');
+$s = ESPHomeHubSitzung::import($s->export());
+$e = $s->empfangen(ESPHomeHubProtokoll::klartextRahmen(36, ''));
+$puffer = $e['senden'];
+$r = ESPHomeHubProtokoll::rahmenLesen($puffer);
+$m = ESPHomeHubProtokoll::zerlegen($r[2] ?? '');
+pruefe(($r[1] ?? 0) === 37 && abs(ESPHomeHubProtokoll::fixed32($m, 1) - time()) < 5 && ESPHomeHubProtokoll::text($m, 2) === 'CET-1CEST,M3.5.0,M10.5.0/3' && isset($m[3]), 'Sitzung beantwortet GetTimeRequest mit Uhrzeit und Zeitzone (übersteht Export/Import)');
+
 // ------------------------------------------------------------------ 4. Gerätemodul mit simuliertem Gerät
 abschnitt('Gerätemodul gegen simuliertes Gerät (unverschlüsselt)');
 

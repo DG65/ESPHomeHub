@@ -342,6 +342,7 @@ class ESPHomeHubGeraet extends IPSModule
         try {
             // Das Gerät kürzt client_info auf 31 Byte, auch mitten im Umlaut (live 28.10.2026) — selbst an der Zeichengrenze kürzen.
             [$sitzung, $bytes] = ESPHomeHubSitzung::starten($psk, mb_strcut('Symcon ' . IPS_GetName($this->InstanceID), 0, 31, 'UTF-8'));
+            $sitzung->setzeZeitzone(ESPHomeHubZeitzone::posix(date_default_timezone_get()));
             $this->SetBuffer('Sitzung', $sitzung->export());
             $this->SetBuffer('LetzterEmpfang', '0');
             $this->rohSenden($bytes);

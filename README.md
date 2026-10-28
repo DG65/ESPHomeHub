@@ -1,7 +1,7 @@
 # ESPHomeHub
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Modul Version](https://img.shields.io/badge/Modul-0.3.1-informational)
+![Modul Version](https://img.shields.io/badge/Modul-0.3.2-informational)
 ![Symcon Version](https://img.shields.io/badge/Symcon-9.0%2B-informational)
 ![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange)
 [![Check Style](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml/badge.svg)](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml)
@@ -101,7 +101,8 @@ bleibt ihre Variable samt Archiv stehen und kann von Hand gelöscht werden.
   versucht es erst nach einer Änderung wieder.
 - Die Variable **Verbunden** eignet sich als Auslöser, z. B. für eine Meldung, wenn ein Gerät
   ausfällt.
-- Fragt das Gerät nach der Uhrzeit (`time: platform: homeassistant`), antwortet ESPHomeHub.
+- Fragt das Gerät nach der Uhrzeit (`time: platform: homeassistant`), antwortet ESPHomeHub mit
+  Uhrzeit und der Zeitzone von Symcon, einschließlich Sommerzeit-Regeln.
 
 | Status | Bedeutung |
 |---|---|

@@ -51,6 +51,13 @@
 - Live 28.10.2026 gegen das Host-Testgerät mit allen Typen: 15 Entitäten, 18 Befehle zurückgemeldet,
   Zeitabfrage beantwortet, Ereignis nach Knopf.
 
+## Zeitzone (0.3.2)
+
+- GetTimeResponse = epoch (fixed32) + `timezone` (POSIX-Text, veraltet) + `parsed_timezone` (Feld 3, sint32 ZigZag,
+  DSTRule-Untermeldungen immer gesetzt). Ohne Feld 3 bleibt ein Gerät ab ESPHome 2026.9 auf der Zeitzone seines
+  Build-Rechners — live gesehen am Container-Testgerät (UTC statt MEZ). `libs/ESPHomeHubZeitzone.php`, byte-gleich
+  gegen aioesphomeapi (`.tools/fixture-zeitzone.py`), Ersatz ohne zoneinfo aus `DateTimeZone::getTransitions`.
+
 ## Konfigurator (0.3.0)
 
 - DNS-SD-Instanz `{780B2D48-…}`: `ZC_QueryServiceType(id, '_esphomelib._tcp', '')` → `[{Name, Type, Domain}]`,

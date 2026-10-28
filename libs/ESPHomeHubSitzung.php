@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/ESPHomeHubNoise.php';
 require_once __DIR__ . '/ESPHomeHubProtokoll.php';
+require_once __DIR__ . '/ESPHomeHubZeitzone.php';
 
 // ===========================================================================
 // Eine API-Sitzung mit einem ESPHome-Gerät, ohne Symcon und ohne Netz.
@@ -38,6 +39,7 @@ final class ESPHomeHubSitzung
     private ?ESPHomeHubCipher $tx = null;
     private ?ESPHomeHubCipher $rx = null;
     private string $clientInfo = '';
+    private string $zeitzone = '';
     private array $server = [];
 
     /**
@@ -58,6 +60,12 @@ final class ESPHomeHubSitzung
         // Leerer ClientHello-Rahmen, dann gleich der Handshake (0x00 = „kein Fehler“ + Nachricht 1).
         $bytes = ESPHomeHubProtokoll::noiseRahmen('') . ESPHomeHubProtokoll::noiseRahmen("\x00" . $s->noise->nachricht1($schluessel));
         return [$s, $bytes];
+    }
+
+    /** POSIX-Zeitzone für Zeitanfragen des Geräts (ESPHomeHubZeitzone::posix). */
+    public function setzeZeitzone(string $posix): void
+    {
+        $this->zeitzone = $posix;
     }
 
     public function phase(): string
@@ -180,7 +188,8 @@ final class ESPHomeHubSitzung
                 return;
             case ESPHomeHubProtokoll::GET_TIME_REQUEST:
                 // Geräte mit „time: platform: homeassistant" fragen den API-Client nach der Uhrzeit.
-                $raus .= $this->senden(ESPHomeHubProtokoll::GET_TIME_RESPONSE, ESPHomeHubProtokoll::feldFixed32(1, time()));
+                // Seit ESPHome 2026.9 nur mit parsed_timezone in der richtigen Zeitzone.
+                $raus .= $this->senden(ESPHomeHubProtokoll::GET_TIME_RESPONSE, ESPHomeHubZeitzone::getTimeResponse(time(), $this->zeitzone));
                 return;
             case ESPHomeHubProtokoll::PING_REQUEST:
                 $raus .= $this->senden(ESPHomeHubProtokoll::PING_RESPONSE);
@@ -215,6 +224,7 @@ final class ESPHomeHubSitzung
             'tx'     => $this->tx?->export(),
             'rx'     => $this->rx?->export(),
             'client' => $this->clientInfo,
+            'tz'     => $this->zeitzone,
             'server' => $this->server,
         ]);
     }
@@ -233,6 +243,7 @@ final class ESPHomeHubSitzung
         $s->tx = is_array($d['tx']) ? ESPHomeHubCipher::import($d['tx']) : null;
         $s->rx = is_array($d['rx']) ? ESPHomeHubCipher::import($d['rx']) : null;
         $s->clientInfo = (string)$d['client'];
+        $s->zeitzone = (string)($d['tz'] ?? '');
         $s->server = (array)$d['server'];
         return $s;
     }
