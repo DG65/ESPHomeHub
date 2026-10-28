@@ -211,9 +211,10 @@ class ESPHomeHubGeraet extends IPSModule
             throw new Exception('„' . ($e['name'] ?: IPS_GetName($this->InstanceID)) . '" nicht gesendet: Gerät ist nicht verbunden.');
         }
         $this->SendDebug('Befehl', $Ident . ' = ' . json_encode($Value), 0);
-        // Knöpfe und Fahrbefehle haben keinen Zustand, den das Gerät zurückmeldet.
-        if ($sofort !== null) {
-            $this->wertSetzen((string)$Ident, $sofort);
+        // Knöpfe und Fahrbefehle haben keinen Zustand, den das Gerät zurückmeldet. Immer setzen,
+        // auch bei gleichem Wert: der neue Zeitstempel ist für Ereignisse „bei Aktualisierung" der Druck.
+        if ($sofort !== null && @$this->GetIDForIdent((string)$Ident)) {
+            $this->SetValue((string)$Ident, $sofort);
         }
     }
 

@@ -130,7 +130,7 @@ class IPSModule
     protected function GetIDForIdent($ident) { $GLOBALS['ZULETZT'] = $ident; return isset($this->z()['v'][$ident]) ? 30000 : false; }
     protected function GetValue($ident) { return $this->z()['v'][$ident]['wert']; }
     protected function EnableAction($ident) { $this->z()['v'][$ident]['aktion'] = true; }
-    protected function SetValue($ident, $w) { $this->z()['v'][$ident]['wert'] = $w; }
+    protected function SetValue($ident, $w) { $this->z()['v'][$ident]['wert'] = $w; $GLOBALS['GESETZT'][] = $ident; }
 }
 
 function IPS_GetKernelRunlevel() { return KR_READY; }
@@ -413,6 +413,9 @@ pruefe(zustand()['v']['e00000005']['wert'] === false, 'Schalter folgt der Rückm
 $sim->empfangen = [];
 geraet()->RequestAction('e00000006', 0);
 pruefe($sim->empfangen === [62] && zustand()['v']['e00000006']['wert'] === 0, 'Knopf: ButtonCommandRequest, Wert sofort');
+$GLOBALS['GESETZT'] = [];
+geraet()->RequestAction('e00000006', 0);
+pruefe($GLOBALS['GESETZT'] === ['e00000006'], 'zweiter Knopfdruck aktualisiert die Variable trotz gleichem Wert');
 $fehler = function (string $ident, $wert): string {
     try {
         geraet()->RequestAction($ident, $wert);

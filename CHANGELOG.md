@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (28.10.2026)
+
+- Knopf und Fahrbefehle aktualisieren ihre Variable bei jedem Druck, auch bei gleichem Wert — Ereignisse „bei Aktualisierung" sehen so jeden Druck.
+
 ## 0.2.0 (28.10.2026)
 
 - Entitäten werden zu Variablen: Sensor, Binärsensor, Textsensor, Schalter, Knopf, Zahl, Auswahl, Text, Licht (an/aus, Helligkeit, Farbe, Farbtemperatur), Abdeckung/Rollladen und Ventil (Position, Öffnen/Stopp/Schließen), Lüfter (Stufe), Schloss (verriegeln, öffnen), Klima (Betriebsart, Solltemperatur, Ist-Temperatur, Tätigkeit), Ereignis.
