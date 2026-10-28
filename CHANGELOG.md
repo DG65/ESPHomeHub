@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4 (28.10.2026)
+
+- Keine Warnung mehr im Meldungsfenster, wenn der Client Socket kurz nach dem Löschen des Geräts noch eine Statusänderung meldet.
+
 ## 0.3.3 (28.10.2026)
 
 - Übernehmen ohne Änderung, Symcon-Start und Modul-Update bauen die Verbindung nicht mehr zwangsweise neu auf. Steht der Socket schon, beginnt nur die API-Sitzung neu; geschlossen und geöffnet wird er nur bei neuer Adresse, neuem Port oder neuem Schlüssel.

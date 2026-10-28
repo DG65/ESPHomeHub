@@ -142,6 +142,7 @@ function IPS_SetName($id, $n) { if ($id === 20000) { $GLOBALS['SOCKET']['name'] 
 function IPS_CreateInstance($g) { $GLOBALS['TRANSPORT']?->schliessen(); $GLOBALS['SOCKET'] = ['id' => 20000, 'Host' => '', 'Port' => 0, 'Open' => false, 'status' => IS_INACTIVE, 'name' => '']; $GLOBALS['ANGELEGT'] = ($GLOBALS['ANGELEGT'] ?? 0) + 1; return 20000; }
 function IPS_ConnectInstance($id, $eltern) { $GLOBALS['VERBUNDEN_MIT'] = $eltern; return true; }
 function IPS_DeleteInstance($id) { return true; }
+function IPS_InstanceExists($id) { return empty($GLOBALS['GELOESCHT']); }
 function IPS_GetLibrary($g) { return ['Version' => '0.1.0', 'Build' => 1]; }
 function IPS_SemaphoreEnter($n, $t) { return true; }
 function IPS_SemaphoreLeave($n) { return true; }
@@ -597,6 +598,18 @@ pruefe($GLOBALS['SOCKET']['name'] === 'ESPHome-Verbindung (Flur)', 'namenloser S
 pruefe($sim->empfangen === [1, 9, 11, 20] && zustand()['status'] === 102, 'danach verbunden');
 geraet()->Wache();
 pruefe(($GLOBALS['ANGELEGT'] ?? 0) === 1, 'vorhandener Socket: kein zweiter');
+
+// Gerät gelöscht, der Socket meldet danach noch eine Statusänderung (live 28.10.2026: Warnung „Instanz existiert nicht")
+$GLOBALS['GELOESCHT'] = true;
+$vorher = zustand()['status'];
+try {
+    geraet()->MessageSink(0, 20000, IM_CHANGESTATUS, [200, 0]);
+    $still = zustand()['status'] === $vorher;
+} catch (Throwable $e) {
+    $still = false;
+}
+$GLOBALS['GELOESCHT'] = false;
+pruefe($still, 'Statusmeldung nach dem Löschen wird ignoriert');
 
 // ------------------------------------------------------------------ 4b. Konfigurator
 abschnitt('Konfigurator (DNS-SD wie Symcon 9.0)');

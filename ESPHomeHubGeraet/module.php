@@ -132,6 +132,10 @@ class ESPHomeHubGeraet extends IPSModule
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data)
     {
+        // Meldungen können noch eintreffen, wenn die Instanz gerade gelöscht wurde.
+        if (!IPS_InstanceExists($this->InstanceID)) {
+            return;
+        }
         if ($Message === IPS_KERNELMESSAGE && ($Data[0] ?? null) === KR_READY) {
             $this->UnregisterMessage(0, IPS_KERNELMESSAGE);
             $this->ApplyChanges();
