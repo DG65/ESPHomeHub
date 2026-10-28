@@ -563,7 +563,7 @@ class ESPHomeHubGeraet extends IPSModule
         if (!$anders) {
             $ist = IPS_GetVariablePresentation($id);
             foreach ($v['pres'] as $k => $wert) {
-                if (!array_key_exists($k, $ist) || json_encode($ist[$k]) !== json_encode($wert)) {
+                if (!array_key_exists($k, $ist) || !self::gleich($ist[$k], $wert)) {
                     $anders = true;
                     break;
                 }
@@ -579,6 +579,36 @@ class ESPHomeHubGeraet extends IPSModule
         if ($v['aktion']) {
             $this->EnableAction($v['ident']);
         }
+    }
+
+    /**
+     * Darstellungswert inhaltlich vergleichen. Symcon gibt ihn umgeformt zurück (live 28.10.2026):
+     * ganze Kommazahlen als int (10 statt 10.0), OPTIONS neu serialisiert (Schlüssel sortiert,
+     * Umlaute unmaskiert), float32-Schritte ungerundet. Ein Textvergleich schriebe sonst bei jeder
+     * Verbindung alle Variablen neu.
+     */
+    private static function gleich($ist, $soll): bool
+    {
+        if (is_string($ist) && is_string($soll) && $ist !== $soll && in_array(substr(ltrim($soll), 0, 1), ['[', '{'], true)) {
+            $a = json_decode($ist, true);
+            $b = json_decode($soll, true);
+            return is_array($a) && is_array($b) && self::gleich($a, $b);
+        }
+        if (is_array($ist) && is_array($soll)) {
+            if (count($ist) !== count($soll)) {
+                return false;
+            }
+            foreach ($soll as $k => $w) {
+                if (!array_key_exists($k, $ist) || !self::gleich($ist[$k], $w)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if ((is_int($ist) || is_float($ist)) && (is_int($soll) || is_float($soll))) {
+            return abs($ist - $soll) < 1e-6;
+        }
+        return $ist === $soll;
     }
 
     private function wertSetzen(string $ident, $wert): void

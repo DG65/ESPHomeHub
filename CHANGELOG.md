@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 (28.10.2026)
+
+- Darstellungen werden inhaltlich verglichen: Symcon gibt sie umgeformt zurück (ganze Zahlen ohne Nachkomma, OPTIONS neu sortiert), bisher hätte jede Neuverbindung Zahlen-, Klima- und Auswahlvariablen neu geschrieben.
+- Grenzen und Schrittweiten aus dem Gerät als glatte Dezimalzahl (0,1 statt 0,100000001).
+
 ## 0.2.1 (28.10.2026)
 
 - Knopf und Fahrbefehle aktualisieren ihre Variable bei jedem Druck, auch bei gleichem Wert — Ereignisse „bei Aktualisierung" sehen so jeden Druck.

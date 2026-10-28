@@ -116,8 +116,8 @@ final class ESPHomeHubEntitaeten
                     'helligkeit' => ($faehig & 2) !== 0,
                     'rgb'        => ($faehig & 32) !== 0,
                     'farbtemp'   => ($faehig & 8) !== 0,
-                    'minMired'   => $P::float($m, 9),
-                    'maxMired'   => $P::float($m, 10),
+                    'minMired'   => $P::floatGlatt($m, 9),
+                    'maxMired'   => $P::floatGlatt($m, 10),
                 ];
                 break;
             case 'climate':
@@ -127,13 +127,13 @@ final class ESPHomeHubEntitaeten
                     'ist'      => ($flags & 1) !== 0 || $P::bool($m, 5),
                     'zweiPunkt' => ($flags & 6) !== 0 || $P::bool($m, 6),
                     'aktion'   => ($flags & 32) !== 0 || $P::bool($m, 12),
-                    'min'      => $P::float($m, 8),
-                    'max'      => $P::float($m, 9),
-                    'schritt'  => $P::float($m, 10),
+                    'min'      => $P::floatGlatt($m, 8),
+                    'max'      => $P::floatGlatt($m, 9),
+                    'schritt'  => $P::floatGlatt($m, 10),
                 ];
                 break;
             case 'number':
-                $e += ['min' => $P::float($m, 6), 'max' => $P::float($m, 7), 'schritt' => $P::float($m, 8), 'einheit' => $P::text($m, 11), 'eingabe' => $P::zahl($m, 12) === 1];
+                $e += ['min' => $P::floatGlatt($m, 6), 'max' => $P::floatGlatt($m, 7), 'schritt' => $P::floatGlatt($m, 8), 'einheit' => $P::text($m, 11), 'eingabe' => $P::zahl($m, 12) === 1];
                 break;
             case 'select':
                 $e += ['optionen' => $P::texte($m, 6)];

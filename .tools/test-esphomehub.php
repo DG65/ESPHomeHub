@@ -123,6 +123,7 @@ class IPSModule
         if ($behalten) {
             $this->z()['v'][$ident] ??= ['typ' => $typ, 'wert' => false];
             $this->z()['v'][$ident]['pres'] = $pres;
+            $this->z()['v'][$ident]['symcon'] = symconUmformen($pres);
         } else {
             unset($this->z()['v'][$ident]);
         }
@@ -153,7 +154,27 @@ function IPS_GetInstance($id)
 }
 function IPS_GetProperty($id, $k) { return $GLOBALS['SOCKET'][$k]; }
 // Variablen-Ersatz: ID 30000+n je Ident (GetIDForIdent liefert 30000 für jede vorhandene Variable).
-function IPS_GetVariablePresentation($id) { return $GLOBALS['Z'][10000]['v'][$GLOBALS['ZULETZT']]['pres'] ?? []; }
+/** So gibt Symcon 9.0 eine Darstellung zurück (live 28.10.2026): ganze Kommazahlen als int, OPTIONS mit
+ *  sortierten Schlüsseln und unmaskierten Umlauten, dazu weitere Standardschlüssel. */
+function symconUmformen(array $pres): array
+{
+    $out = ['USAGE_TYPE' => 0, 'ICON' => ''];
+    foreach ($pres as $k => $w) {
+        if (is_float($w) && floor($w) == $w) {
+            $w = (int)$w;
+        }
+        if ($k === 'OPTIONS') {
+            $o = json_decode($w, true);
+            foreach ($o as &$e) {
+                ksort($e);
+            }
+            $w = json_encode($o, JSON_UNESCAPED_UNICODE);
+        }
+        $out[$k] = $w;
+    }
+    return $out;
+}
+function IPS_GetVariablePresentation($id) { return $GLOBALS['Z'][10000]['v'][$GLOBALS['ZULETZT']]['symcon'] ?? []; }
 function IPS_GetVariable($id) { return ['VariableType' => $GLOBALS['Z'][10000]['v'][$GLOBALS['ZULETZT']]['typ']]; }
 function IPS_GetObject($id) { return ['ObjectPosition' => 0]; }
 function IPS_SetPosition($id, $p) { return true; }

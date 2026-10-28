@@ -46,7 +46,7 @@
   Beschreibungen, Zustände und **Befehls-Bytes byte-gleich** zu Python. Deshalb `feldFloat` ohne 0.0 (proto3).
 - Sitzung: nach DeviceInfo → ListEntities (11), nach Done (19) → SubscribeStates (20); GetTimeRequest (36)
   → GetTimeResponse (37). Variablen erst nach vollständiger Liste anlegen.
-- Darstellung nur bei Abweichung neu schreiben (`variableSicherstellen`, sonst Update-Sturm), Name/Position
+- Darstellung nur bei Abweichung neu schreiben (`variableSicherstellen`, sonst Update-Sturm) — **inhaltlich** vergleichen (`gleich()`): Symcon 9.0 gibt ganze Floats als int und OPTIONS neu serialisiert (Schlüssel sortiert, Umlaute roh) zurück; der Prüfstand bildet das in `symconUmformen()` nach, Name/Position
   eines Bestands nie überschreiben, verschwundene Entitäten nicht löschen (Archiv).
 - Variable folgt der Rückmeldung (State), außer Knopf/Fahrbefehl/Schloss-Öffnen (kein State) → sofort.
 - Live 28.10.2026 gegen das Host-Testgerät mit allen Typen: 15 Entitäten, 18 Befehle zurückgemeldet,

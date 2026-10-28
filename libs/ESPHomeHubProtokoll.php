@@ -174,6 +174,13 @@ final class ESPHomeHubProtokoll
         return isset($m[$feld]) && $m[$feld][0][0] === 5 ? (float)unpack('g', $m[$feld][0][1])[1] : 0.0;
     }
 
+    /** float32 als glatte Dezimalzahl (0.1 statt 0.10000000149…), für Grenzen und Schrittweiten. */
+    public static function floatGlatt(array $m, int $feld): float
+    {
+        $w = self::float($m, $feld);
+        return is_finite($w) ? (float)sprintf('%.7g', $w) : 0.0;
+    }
+
     /** @return string[] */
     public static function texte(array $m, int $feld): array
     {
