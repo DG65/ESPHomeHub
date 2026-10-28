@@ -1,0 +1,12 @@
+{
+  "id": "{E431F148-7264-4C2A-83AD-C3FA1CDE96B8}",
+  "author": "DG65",
+  "name": "ESPHomeHub",
+  "url": "https://github.com/DG65/ESPHomeHub",
+  "compatibility": {
+    "version": "9.0"
+  },
+  "version": "0.1.0",
+  "build": 1,
+  "date": 1793142000
+}

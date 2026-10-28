@@ -1,0 +1,18 @@
+{
+  "id": "{796D9D82-B2F7-4F80-BAA7-8CC50237B2EF}",
+  "name": "ESPHomeHubGeraet",
+  "type": 3,
+  "vendor": "ESPHome",
+  "aliases": [
+    "ESPHome-Gerät"
+  ],
+  "url": "https://github.com/DG65/ESPHomeHub",
+  "parentRequirements": [
+    "{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}"
+  ],
+  "childRequirements": [],
+  "implemented": [
+    "{018EF6B5-AB94-40C6-AA53-46943E824ACF}"
+  ],
+  "prefix": "ESPH"
+}
