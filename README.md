@@ -17,7 +17,7 @@ ein Licht oder einen Bluetooth-Proxy. Bisher ging das in Symcon nur über MQTT a
 ESPHomeHub spricht das Gerät so an wie Home Assistant: eine TCP-Verbindung je Gerät, das Gerät
 beschreibt sich selbst, Änderungen kommen sofort.
 
-**Stand 0.3.0:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
+**Stand 0.3.4:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
 Wiederverbinden, Geräteinfo und alle gängigen Entitäten als Variablen. Der Bluetooth-Proxy wird
 ein eigenes Modul.
 
