@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5 (28.10.2026)
+
+- Panel „Rückmeldungen": Link zum ESPHomeHub-Thread im Symcon-Forum, GitHub bleibt als zweiter Weg.
+
 ## 0.3.4 (28.10.2026)
 
 - Keine Warnung mehr im Meldungsfenster, wenn der Client Socket kurz nach dem Löschen des Geräts noch eine Statusänderung meldet.

@@ -37,6 +37,7 @@ trait ESPHomeHubFormular
 
     private static $ESPHOMEHUB_REPO_URL     = 'https://github.com/DG65/ESPHomeHub';
     private static $ESPHOMEHUB_ISSUES_URL   = 'https://github.com/DG65/ESPHomeHub/issues';
+    private static $ESPHOMEHUB_FORUM_URL    = 'https://community.symcon.de/t/beta-modul-esphomehub-esphome-geraete-direkt-in-ip-symcon-ohne-mqtt-und-ohne-home-assistant/144807';
     private static $ESPHOMEHUB_LICENSE_URL  = 'https://github.com/DG65/ESPHomeHub/blob/beta/LICENSE';
     private static $ESPHOMEHUB_PAYPAL_URL   = 'https://paypal.me/DietmarGureth';
     private static $ESPHOMEHUB_LIBRARY_GUID = '{E431F148-7264-4C2A-83AD-C3FA1CDE96B8}';
@@ -157,12 +158,13 @@ trait ESPHomeHubFormular
         if ($this->ReadAttributeBoolean('ForumHintGone')) {
             return null;
         }
-        // Noch kein Forum-Thread: Rückmeldungen vorerst über GitHub.
+        // Forum-Thread seit 0.3.5; GitHub bleibt als zweiter Weg für Fehlerberichte.
         return [
             'type' => 'ExpansionPanel', 'name' => 'ForumHintPanel', 'expanded' => true,
             'caption' => '💬  Rückmeldungen',
             'items' => [
-                ['type' => 'Label', 'caption' => '🧪 ESPHomeHub ist neu. Läuft dein Gerät? Fehlt etwas? Schreib es gern als Meldung auf GitHub — mit ESPHome-Version und Chip (ESP32, ESP8266 …) aus dem Panel „Gerät".'],
+                ['type' => 'Label', 'caption' => '🧪 ESPHomeHub ist neu. Läuft dein Gerät? Fehlt etwas? Schreib es gern in den ESPHomeHub-Thread im Symcon-Forum — mit ESPHome-Version und Chip (ESP32, ESP8266 …) aus dem Panel „Gerät".'],
+                ['type' => 'Button', 'caption' => 'Zum Forum-Thread', 'onClick' => "echo '" . self::$ESPHOMEHUB_FORUM_URL . "';", 'link' => true],
                 ['type' => 'Button', 'caption' => 'Fehler auf GitHub melden', 'onClick' => "echo '" . self::$ESPHOMEHUB_ISSUES_URL . "';", 'link' => true],
                 ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => $this->esphomehubPrefix() . '_AckForumHint($id);'],
             ],
