@@ -60,6 +60,8 @@
   Socket-Wechsel, höchstens neue API-Sitzung. Prüfstand zählt Socket-ApplyChanges.
 - Kein MC_UpdateModule bei aktiven ESPHomeHub-Instanzen im Live-System ohne Dietmars Okay.
 - Zeitzone (0.3.2) bestätigt an einem mit TZ=UTC gebauten Host-Gerät: zeigt danach Ortszeit.
+- Absturztest 28.10.2026 (mit Dietmars Okay, 0.3.4, Container-Gerät aktiv): MC_UpdateModule ohne neuen Commit +
+  sofort ESPH_Neuverbinden → kein Absturz, Gerät/Socket bleiben 102.
 
 ## Zeitzone (0.3.2)
 
