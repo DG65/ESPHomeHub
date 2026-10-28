@@ -1,0 +1,14 @@
+{
+  "id": "{D3B32407-FD69-4647-8915-4DE17C9D5C07}",
+  "name": "ESPHomeHubKonfigurator",
+  "type": 4,
+  "vendor": "ESPHome",
+  "aliases": [
+    "ESPHome-Konfigurator"
+  ],
+  "url": "https://github.com/DG65/ESPHomeHub",
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "ESPHC"
+}

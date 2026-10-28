@@ -6,9 +6,8 @@
   Dietmars Entscheidung 28.10.2026. `library.json→name` = „ESPHomeHub", Repo `DG65/ESPHomeHub`.
   Übernimmt alle handwerklichen Verbund-Konventionen aus `/Users/dietmar/Nextcloud/Claude/SUITE.md`.
 - **Bluetooth-Proxy wird ein eigenes Modul** (Dietmar 28.10.2026), das als Kind am ESPHome-Gerät hängt.
-- Module/Präfixe: `ESPHomeHubGeraet` (ESPH, Elternteil Client Socket). Reserviert:
-  Konfigurator-GUID `{D3B32407-FD69-4647-8915-4DE17C9D5C07}`, Präfix ESPHC (nie denselben Präfix wie das
-  Gerät, sonst „Cannot redeclare function"). Klassen/Präfixe/GUIDs eingefroren, sobald eine Instanz existiert.
+- Module/Präfixe: `ESPHomeHubGeraet` (ESPH, Elternteil Client Socket), `ESPHomeHubKonfigurator` (ESPHC,
+  `{D3B32407-FD69-4647-8915-4DE17C9D5C07}`; nie denselben Präfix wie das Gerät, sonst „Cannot redeclare function"). Klassen/Präfixe/GUIDs eingefroren, sobald eine Instanz existiert.
 - Machbarkeit und Prototyp: `../ESPHome-Machbarkeit.md`, Befund des Wegwerf-Prototyps
   `../ESPHome-Prototyp/BEFUND.md`.
 
@@ -51,6 +50,19 @@
 - Variable folgt der Rückmeldung (State), außer Knopf/Fahrbefehl/Schloss-Öffnen (kein State) → sofort.
 - Live 28.10.2026 gegen das Host-Testgerät mit allen Typen: 15 Entitäten, 18 Befehle zurückgemeldet,
   Zeitabfrage beantwortet, Ereignis nach Knopf.
+
+## Konfigurator (0.3.0)
+
+- DNS-SD-Instanz `{780B2D48-…}`: `ZC_QueryServiceType(id, '_esphomelib._tcp', '')` → `[{Name, Type, Domain}]`,
+  `ZC_QueryService(id, Name, Type, Domain)` → `[{Name, Host, Port, TXTRecords[], IPv4[], IPv6[]}]` (Format live
+  28.10.2026 an einem `_http._tcp`-Gerät gelesen; dauert ~0,5 s). Vorbild: Schnittcher/ShellyV2 ShellyConfigurator.
+- ESPHome-TXT (aus `esphome/components/mdns`): `friendly_name`, `version`, `mac` (klein, ohne Trenner), `platform`,
+  `board`, `network`, `api_encryption` (mit Schlüssel) bzw. `api_encryption_supported` (ohne), `project_name/_version`.
+- Zuordnung vorhandener Instanzen über MAC aus `ESPH_GetDeviceInfo`, sonst Adresse+Port. Anlegen als Kette Gerät +
+  Client Socket (Open false, das Gerät öffnet selbst).
+- PHP-Methoden sind case-insensitiv: öffentliche `Suchen()` und private `suchen()` kollidieren („Cannot redeclare").
+- **Nicht live mit einem echten ESPHome-Gerät im LAN geprüft:** im Heimnetz gibt es keins, das Host-Testgerät am Mac
+  sendet sein mDNS nicht durch den VPN-Tunnel.
 
 ## Offen / am echten Gerät prüfen
 

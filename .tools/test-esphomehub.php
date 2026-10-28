@@ -152,7 +152,29 @@ function IPS_GetInstance($id)
     }
     return ['ConnectionID' => $GLOBALS['VERBUNDEN_MIT']];
 }
-function IPS_GetProperty($id, $k) { return $GLOBALS['SOCKET'][$k]; }
+function IPS_GetProperty($id, $k) { return $id === 10000 ? $GLOBALS['Z'][10000]['p'][$k] : $GLOBALS['SOCKET'][$k]; }
+// DNS-SD-Ersatz im Format, das Symcon 9.0 live liefert (28.10.2026)
+$GLOBALS['ZC'] = [];
+$GLOBALS['DNSSD'] = [10244];
+function IPS_GetInstanceListByModuleID($g)
+{
+    return match ($g) {
+        '{780B2D48-916C-4D59-AD35-5A429B2355A5}' => $GLOBALS['DNSSD'],
+        '{796D9D82-B2F7-4F80-BAA7-8CC50237B2EF}' => isset($GLOBALS['Z'][10000]['p']['Host']) ? [10000] : [],
+        default => [],
+    };
+}
+function ZC_QueryServiceType($id, $typ, $domain) { return array_map(fn ($d) => ['Name' => $d['Name'], 'Type' => '_esphomelib._tcp', 'Domain' => 'local'], $GLOBALS['ZC']); }
+function ZC_QueryService($id, $name, $typ, $domain)
+{
+    foreach ($GLOBALS['ZC'] as $d) {
+        if ($d['Name'] === $name) {
+            return [['Name' => "$name._esphomelib._tcp.local", 'Host' => $d['Host'], 'Port' => $d['Port'], 'TXTRecords' => $d['TXT'], 'IPv4' => $d['IPv4'], 'IPv6' => []]];
+        }
+    }
+    return [];
+}
+function ESPH_GetDeviceInfo($id) { return geraet()->GetDeviceInfo(); }
 // Variablen-Ersatz: ID 30000+n je Ident (GetIDForIdent liefert 30000 für jede vorhandene Variable).
 /** So gibt Symcon 9.0 eine Darstellung zurück (live 28.10.2026): ganze Kommazahlen als int, OPTIONS mit
  *  sortierten Schlüsseln und unmaskierten Umlauten, dazu weitere Standardschlüssel. */
@@ -203,6 +225,7 @@ function empfangen(string $bytes): void
 }
 
 require_once $ROOT . '/ESPHomeHubGeraet/module.php';
+require_once $ROOT . '/ESPHomeHubKonfigurator/module.php';
 $P = 'ESPHomeHubProtokoll';
 
 // ------------------------------------------------------------------ 1. Protobuf und Rahmen
@@ -358,7 +381,7 @@ final class SimGeraet
             }
             $antwort = match ($r[1]) {
                 1 => ESPHomeHubProtokoll::klartextRahmen(2, ESPHomeHubProtokoll::feldZahl(1, 1) . ESPHomeHubProtokoll::feldZahl(2, 19) . ESPHomeHubProtokoll::feldText(4, 'sim')),
-                9 => ESPHomeHubProtokoll::klartextRahmen(10, ESPHomeHubProtokoll::feldText(2, 'sim') . ESPHomeHubProtokoll::feldText(4, '2026.10.1') . ESPHomeHubProtokoll::feldText(6, 'esp32dev') . ESPHomeHubProtokoll::feldText(13, 'Simulator Küche')),
+                9 => ESPHomeHubProtokoll::klartextRahmen(10, ESPHomeHubProtokoll::feldText(2, 'sim') . ESPHomeHubProtokoll::feldText(3, 'AA:BB:CC:00:00:01') . ESPHomeHubProtokoll::feldText(4, '2026.10.1') . ESPHomeHubProtokoll::feldText(6, 'esp32dev') . ESPHomeHubProtokoll::feldText(13, 'Simulator Küche')),
                 11 => $GLOBALS['SIM_LISTE'],
                 20 => $GLOBALS['SIM_ZUSTAENDE'],
                 33 => ESPHomeHubProtokoll::klartextRahmen(26, $r[2]),   // Schalter: Gerät meldet den neuen Zustand zurück
@@ -517,6 +540,77 @@ pruefe($sim->empfangen === [1, 9, 11, 20] && zustand()['status'] === 102, 'danac
 geraet()->Wache();
 pruefe(($GLOBALS['ANGELEGT'] ?? 0) === 1, 'vorhandener Socket: kein zweiter');
 
+// ------------------------------------------------------------------ 4b. Konfigurator
+abschnitt('Konfigurator (DNS-SD wie Symcon 9.0)');
+$GLOBALS['Z'][10000]['p']['Host'] = '192.168.2.50';   // Instanz mit alter IP, Gerät ist umgezogen
+$GLOBALS['ZC'] = [
+    ['Name' => 'wohnzimmer', 'Host' => 'wohnzimmer.local.', 'Port' => 6053, 'IPv4' => ['192.168.2.77'],
+     'TXT' => ['friendly_name=Wohnzimmer', 'version=2026.10.1', 'mac=aabbcc000001', 'platform=ESP32', 'board=esp32dev', 'network=wifi', 'api_encryption=Noise_NNpsk0_25519_ChaChaPoly_SHA256']],
+    ['Name' => 'kueche', 'Host' => 'kueche.local', 'Port' => 6053, 'IPv4' => ['192.168.2.78'],
+     'TXT' => ['friendly_name=Küche', 'version=2025.12.0', 'mac=aabbcc000002', 'platform=ESP8266', 'board=d1_mini', 'api_encryption_supported=Noise_NNpsk0_25519_ChaChaPoly_SHA256']],
+];
+$k = new ESPHomeHubKonfigurator(11000);
+$k->Create();
+$GLOBALS['Z'][11000]['p']['Adressen'] = json_encode([['Adresse' => '192.168.2.78', 'Port' => 6053], ['Adresse' => '10.0.5.9', 'Port' => 6060]]);
+$k->ApplyChanges();
+$form = json_decode((string)$k->GetConfigurationForm(), true);
+pruefe(is_array($form), 'Konfigurator-Formular ist gültiges JSON');
+$konf = null;
+array_walk_recursive($form, function () {});
+foreach ($form['elements'] as $el) {
+    foreach ($el['items'] ?? [] as $it) {
+        if (($it['type'] ?? '') === 'Configurator') {
+            $konf = $it;
+        }
+    }
+}
+$zeilen = [];
+foreach ($konf['values'] ?? [] as $z) {
+    $zeilen[$z['geraet']] = $z;
+}
+pruefe(count($konf['values'] ?? []) === 3, '3 Zeilen: 2 gefunden, 1 von Hand (die doppelte Hand-Adresse fällt weg): ' . count($konf['values'] ?? []));
+pruefe(($zeilen['wohnzimmer']['instanceID'] ?? 0) === 10000, 'vorhandene Instanz an der MAC erkannt, obwohl die IP gewechselt hat');
+pruefe(($zeilen['wohnzimmer']['schluessel'] ?? '') === '🔑 nötig' && ($zeilen['kueche']['schluessel'] ?? '') === 'ohne', 'Schlüssel-Spalte aus api_encryption');
+pruefe(($zeilen['kueche']['name'] ?? '') === 'Küche' && ($zeilen['kueche']['chip'] ?? '') === 'ESP8266 d1_mini' && ($zeilen['kueche']['mac'] ?? '') === 'AA:BB:CC:00:00:02', 'Anzeigename, Chip, MAC aus TXT');
+$c = $zeilen['kueche']['create'] ?? [];
+pruefe(($c[0]['moduleID'] ?? '') === '{796D9D82-B2F7-4F80-BAA7-8CC50237B2EF}' && ($c[0]['configuration'] ?? []) === ['Host' => '192.168.2.78', 'Port' => 6053]
+    && ($c[1]['moduleID'] ?? '') === '{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}' && ($c[1]['configuration']['Host'] ?? '') === '192.168.2.78', 'Anlegen als Kette: Gerät + Client Socket mit Adresse');
+pruefe(($zeilen['10.0.5.9']['quelle'] ?? '') === 'von Hand eingetragen' && ($zeilen['10.0.5.9']['adresse'] ?? '') === '10.0.5.9:6060' && ($zeilen['10.0.5.9']['schluessel'] ?? '') === '?', 'Hand-Adresse mit eigenem Port');
+$kopf = '';
+array_walk_recursive($form['elements'], function ($v, $key) use (&$kopf) {
+    if ($key === 'caption' && str_contains((string)$v, 'im Netz gefunden (zuletzt')) {
+        $kopf = $v;
+    }
+});
+pruefe(str_starts_with($kopf, '✅ 2 ESPHome-Geräte im Netz gefunden'), 'Kopfzeile mit Anzahl und Uhrzeit: ' . $kopf);
+$acks = [];
+array_walk_recursive($form['elements'], function ($v, $key) use (&$acks) {
+    if ($key === 'onClick') {
+        $acks[] = $v;
+    }
+});
+pruefe(array_filter($acks, fn ($a) => str_starts_with($a, 'ESPH_')) === [] && in_array('ESPHC_Suchen($id);', $acks, true), 'Konfigurator nutzt nur den eigenen Präfix ESPHC');
+
+// Gerät gerade nicht im Netz: vorhandene Instanz bleibt sichtbar
+$GLOBALS['ZC'] = [];
+$GLOBALS['Z'][11000]['p']['Adressen'] = '[]';
+$z = json_decode($k->GetDevices(), true);
+$form = json_decode((string)$k->GetConfigurationForm(), true);
+$werte = $form['elements'][array_key_last(array_filter($form['elements'], fn ($e) => str_contains($e['caption'] ?? '', 'Geräte im Netz')))]['items'][2]['values'] ?? [];
+pruefe($z === [] && count($werte) === 1 && $werte[0]['instanceID'] === 10000 && $werte[0]['quelle'] === 'nicht gefunden' && !isset($werte[0]['create']), 'nicht gefundene Instanz wird ohne „Anlegen" gelistet');
+
+// Ohne DNS-SD-Instanz: klare Kopfzeile, Hand-Adressen gehen weiter
+$GLOBALS['DNSSD'] = [];
+$GLOBALS['Z'][11000]['p']['Adressen'] = json_encode([['Adresse' => 'esp.local', 'Port' => 6053]]);
+$z = json_decode($k->GetDevices(), true);
+$form = (string)$k->GetConfigurationForm();
+pruefe(count($z) === 1 && str_contains($form, 'Keine DNS-SD-Instanz'), 'ohne DNS-SD: Hinweis, Hand-Adresse bleibt');
+$GLOBALS['DNSSD'] = [10244];
+ob_start();
+$k->Suchen();
+$echo = ob_get_clean();
+pruefe(str_contains($echo, '0 ESPHome-Geräte im Netz gefunden'), 'Knopf „Neu suchen" meldet das Ergebnis: ' . $echo);
+
 // ------------------------------------------------------------------ 5. Store-Regeln
 abschnitt('Store-Regeln');
 $GLOBALS['Z'][10000]['p']['Host'] = 'sim.local';
@@ -570,6 +664,9 @@ foreach (zustand()['v'] as $ident => $var) {
 }
 $lib = json_decode((string)file_get_contents($ROOT . '/library.json'), true);
 $mod = json_decode((string)file_get_contents($ROOT . '/ESPHomeHubGeraet/module.json'), true);
+$kmod = json_decode((string)file_get_contents($ROOT . '/ESPHomeHubKonfigurator/module.json'), true);
+pruefe($kmod['name'] === 'ESPHomeHubKonfigurator' && $kmod['type'] === 4 && count($kmod['aliases']) === 1 && $kmod['vendor'] === 'ESPHome', 'Konfigurator module.json: Klasse, Typ 4, ein Alias, vendor');
+pruefe($kmod['prefix'] !== $mod['prefix'], 'Konfigurator und Gerät mit verschiedenem Präfix (SUITE.md: Cannot redeclare)');
 pruefe(array_keys($lib) === ['id', 'author', 'name', 'url', 'compatibility', 'version', 'build', 'date'], 'library.json nur erlaubte Felder');
 pruefe($mod['name'] === 'ESPHomeHubGeraet' && count($mod['aliases']) === 1 && $mod['vendor'] === 'ESPHome', 'module.json: Klasse, ein Alias, vendor');
 pruefe(!preg_match('/symcon|ips/i', $lib['name'] . ' ' . $mod['aliases'][0]), 'kein Symcon/IPS im Namen');

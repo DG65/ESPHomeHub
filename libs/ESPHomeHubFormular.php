@@ -24,6 +24,10 @@ trait ESPHomeHubFormular
         '0.1.1' => [
             '• Fehlt der Client Socket, legt das ESPHome-Gerät ihn selbst an und verbindet ihn.',
         ],
+        '0.3.0' => [
+            '• 🔍 Neu: ESPHome-Konfigurator — findet die Geräte im Netz und legt sie mit einem Klick an, die Spalte „Schlüssel" zeigt, welches Gerät einen braucht.',
+            '• Geräte hinter VLAN- oder VPN-Grenzen lassen sich im Konfigurator von Hand eintragen.',
+        ],
         '0.2.0' => [
             '• 🧩 Sensoren, Schalter, Lichter, Rollläden, Lüfter, Schlösser, Klima und mehr werden automatisch zu Variablen — schaltbare direkt bedienbar.',
             '• Die Variable übernimmt einen neuen Wert erst, wenn das Gerät ihn bestätigt.',

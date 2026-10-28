@@ -1,7 +1,7 @@
 # ESPHomeHub
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Modul Version](https://img.shields.io/badge/Modul-0.2.2-informational)
+![Modul Version](https://img.shields.io/badge/Modul-0.3.0-informational)
 ![Symcon Version](https://img.shields.io/badge/Symcon-9.0%2B-informational)
 ![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange)
 [![Check Style](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml/badge.svg)](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml)
@@ -17,14 +17,15 @@ ein Licht oder einen Bluetooth-Proxy. Bisher ging das in Symcon nur über MQTT a
 ESPHomeHub spricht das Gerät so an wie Home Assistant: eine TCP-Verbindung je Gerät, das Gerät
 beschreibt sich selbst, Änderungen kommen sofort.
 
-**Stand 0.2.0:** Verbindung mit Verschlüsselung, Lebenszeichen, Wiederverbinden, Geräteinfo und
-alle gängigen Entitäten als Variablen. Als Nächstes kommt ein Konfigurator, der die Geräte im
-Netz findet; der Bluetooth-Proxy wird ein eigenes Modul.
+**Stand 0.3.0:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
+Wiederverbinden, Geräteinfo und alle gängigen Entitäten als Variablen. Der Bluetooth-Proxy wird
+ein eigenes Modul.
 
 ## Aufbau
 
 | Instanz | Aufgabe |
 |---|---|
+| **ESPHome-Konfigurator** | findet ESPHome-Geräte im Netz (mDNS) und legt sie samt Verbindung an |
 | **ESPHome-Gerät** | ein ESPHome-Gerät im Netz: Verbindung, Verschlüsselung, Lebenszeichen, Geräteinfo, Entitäten als Variablen |
 | Client Socket | darunter, legt Symcon beim Anlegen mit an (TCP zum Gerät) |
 
@@ -38,9 +39,18 @@ Netz findet; der Bluetooth-Proxy wird ein eigenes Modul.
    ```
    Neue ESPHome-Projekte haben den Schlüssel schon. Ein Passwort („password:") gibt es seit
    ESPHome 2026.1 nicht mehr.
-2. In Symcon eine Instanz **ESPHome-Gerät** anlegen, den angebotenen Client Socket übernehmen.
-3. IP-Adresse oder Hostnamen (z. B. `wohnzimmer.local`) und den Schlüssel eintragen,
-   übernehmen. Im Panel „Gerät" steht danach „✅ Verbunden" mit Name, ESPHome-Version und Chip.
+2. In Symcon eine Instanz **ESPHome-Konfigurator** anlegen. Er zeigt alle ESPHome-Geräte im Netz,
+   mit Anzeigename, Adresse, MAC, Version, Chip und ob ein Schlüssel nötig ist.
+3. Gerät auswählen, „Erstellen": ESPHome-Gerät und Client Socket entstehen in einem Schritt.
+4. In der neuen Instanz den Schlüssel eintragen, übernehmen. Im Panel „Gerät" steht danach
+   „✅ Verbunden", im Panel „Entitäten" alles, was das Gerät kann.
+
+Ohne Konfigurator geht es auch von Hand: Instanz **ESPHome-Gerät** anlegen, IP-Adresse oder
+Hostnamen (z. B. `wohnzimmer.local`) und Schlüssel eintragen.
+
+Die Suche läuft über mDNS und reicht nur im selben Netzsegment. Geräte hinter VLAN-Grenzen, VPN
+oder in Docker ohne Host-Netz trägt man im Konfigurator unter „Adressen von Hand" ein. Vorhandene
+Instanzen erkennt der Konfigurator an der MAC-Adresse, auch wenn sich die IP geändert hat.
 
 Läuft Home Assistant parallel, darf das Gerät beide Verbindungen gleichzeitig halten.
 
@@ -104,6 +114,7 @@ bleibt ihre Variable samt Archiv stehen und kann von Hand gelöscht werden.
 ```php
 ESPH_GetDeviceInfo($id);   // JSON: name, mac, version, modell, anzeigename, hersteller, …
 ESPH_GetEntities($id);     // JSON: alle Entitäten mit Typ, Name, Fähigkeiten; Schlüssel = Ident
+ESPHC_GetDevices($id);     // Konfigurator: gefundene Geräte als JSON
 ESPH_Neuverbinden($id);
 ```
 

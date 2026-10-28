@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 (28.10.2026)
+
+- Neu: ESPHome-Konfigurator. Findet ESPHome-Geräte im Netz (mDNS über Symcons DNS-SD-Instanz) und legt sie samt Client Socket in einem Schritt an.
+- Zeigt je Gerät Anzeigename, Adresse, MAC, ESPHome-Version, Chip und ob ein Schlüssel nötig ist; erkennt vorhandene Instanzen an der MAC, auch nach einem IP-Wechsel.
+- Adressen von Hand für Geräte, die die Suche nicht erreicht (VLAN, VPN, Docker ohne Host-Netz).
+
 ## 0.2.2 (28.10.2026)
 
 - Darstellungen werden inhaltlich verglichen: Symcon gibt sie umgeformt zurück (ganze Zahlen ohne Nachkomma, OPTIONS neu sortiert), bisher hätte jede Neuverbindung Zahlen-, Klima- und Auswahlvariablen neu geschrieben.
