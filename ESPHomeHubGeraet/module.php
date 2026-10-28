@@ -131,7 +131,9 @@ class ESPHomeHubGeraet extends IPSModule
         }
         $eltern = $this->eltern();
         if ($eltern === 0) {
-            $this->verbindungMerken(['zustand' => 'fehler', 'text' => 'Kein Client Socket verbunden.']);
+            // Per Skript angelegte Instanzen bekommen über RequireParent keinen Socket (live 28.10.2026,
+            // wie RoboHub). Erst in der Wache, damit die Konsole beim Anlegen ihren eigenen einhängen kann.
+            $this->socketAnlegen();
             return;
         }
         $v = $this->verbindung();
@@ -289,7 +291,8 @@ class ESPHomeHubGeraet extends IPSModule
             return;
         }
         try {
-            [$sitzung, $bytes] = ESPHomeHubSitzung::starten($psk, 'Symcon ' . IPS_GetName($this->InstanceID));
+            // Das Gerät kürzt client_info auf 31 Byte, auch mitten im Umlaut (live 28.10.2026) — selbst an der Zeichengrenze kürzen.
+            [$sitzung, $bytes] = ESPHomeHubSitzung::starten($psk, mb_strcut('Symcon ' . IPS_GetName($this->InstanceID), 0, 31, 'UTF-8'));
             $this->SetBuffer('Sitzung', $sitzung->export());
             $this->SetBuffer('LetzterEmpfang', '0');
             $this->rohSenden($bytes);
@@ -384,13 +387,33 @@ class ESPHomeHubGeraet extends IPSModule
         }
     }
 
-    /** Vom Konsolen-Dialog angelegten Socket sprechend benennen. */
+    /** Socket mit Standardnamen (Konsole: „Client Socket", per Skript: leer) sprechend benennen. */
     private function socketBenennen(): void
     {
         $eltern = $this->eltern();
-        if ($eltern > 0 && in_array(IPS_GetName($eltern), ['Client Socket', 'Client-Socket'], true)) {
+        if ($eltern > 0 && in_array(IPS_GetName($eltern), ['', 'Client Socket', 'Client-Socket'], true)) {
             IPS_SetName($eltern, 'ESPHome-Verbindung (' . IPS_GetName($this->InstanceID) . ')');
         }
+    }
+
+    /** Fehlenden Client Socket anlegen, verbinden und einstellen (Muster RoboHub). */
+    private function socketAnlegen(): void
+    {
+        $id = @IPS_CreateInstance(self::CLIENT_SOCKET);
+        if (!$id) {
+            $this->verbindungMerken(['zustand' => 'fehler', 'text' => 'Client Socket ließ sich nicht anlegen.']);
+            return;
+        }
+        // Inzwischen doch verbunden (z. B. von der Konsole)? Dann den eigenen wieder entfernen.
+        if ($this->eltern() !== 0 || !@IPS_ConnectInstance($this->InstanceID, $id)) {
+            @IPS_DeleteInstance($id);
+            return;
+        }
+        $this->LogMessage('Client Socket #' . $id . ' angelegt und verbunden.', KL_MESSAGE);
+        $this->socketBenennen();
+        $this->elternBeobachten();
+        $this->verbindungMerken(['zustand' => 'verbinde']);
+        $this->elternEinstellen(true);
     }
 
     // ------------------------------------------------------------------ Hilfen

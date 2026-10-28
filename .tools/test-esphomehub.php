@@ -124,8 +124,13 @@ class IPSModule
 }
 
 function IPS_GetKernelRunlevel() { return KR_READY; }
-function IPS_GetName($id) { return $id === 20000 ? $GLOBALS['SOCKET']['name'] : 'Wohnzimmer'; }
+$GLOBALS['NAME'] = 'Wohnzimmer';
+$GLOBALS['VERBUNDEN_MIT'] = 20000;
+function IPS_GetName($id) { return $id === 20000 ? $GLOBALS['SOCKET']['name'] : $GLOBALS['NAME']; }
 function IPS_SetName($id, $n) { if ($id === 20000) { $GLOBALS['SOCKET']['name'] = $n; } }
+function IPS_CreateInstance($g) { $GLOBALS['TRANSPORT']?->schliessen(); $GLOBALS['SOCKET'] = ['id' => 20000, 'Host' => '', 'Port' => 0, 'Open' => false, 'status' => IS_INACTIVE, 'name' => '']; $GLOBALS['ANGELEGT'] = ($GLOBALS['ANGELEGT'] ?? 0) + 1; return 20000; }
+function IPS_ConnectInstance($id, $eltern) { $GLOBALS['VERBUNDEN_MIT'] = $eltern; return true; }
+function IPS_DeleteInstance($id) { return true; }
 function IPS_GetLibrary($g) { return ['Version' => '0.1.0', 'Build' => 1]; }
 function IPS_SemaphoreEnter($n, $t) { return true; }
 function IPS_SemaphoreLeave($n) { return true; }
@@ -134,7 +139,7 @@ function IPS_GetInstance($id)
     if ($id === 20000) {
         return ['ModuleInfo' => ['ModuleID' => '{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}'], 'InstanceStatus' => $GLOBALS['SOCKET']['status']];
     }
-    return ['ConnectionID' => 20000];
+    return ['ConnectionID' => $GLOBALS['VERBUNDEN_MIT']];
 }
 function IPS_GetProperty($id, $k) { return $GLOBALS['SOCKET'][$k]; }
 function IPS_SetProperty($id, $k, $v) { $GLOBALS['SOCKET'][$k] = $v; }
@@ -269,6 +274,7 @@ final class SimGeraet
 {
     public bool $offen = false;
     public array $empfangen = [];
+    public string $clientInfo = '';
     private string $puffer = '';
     public function oeffnen(string $host, int $port): bool { $this->offen = $host === 'sim.local'; return $this->offen; }
     public function schliessen(): void { $this->offen = false; $this->puffer = ''; }
@@ -277,6 +283,9 @@ final class SimGeraet
         $this->puffer .= $bytes;
         while (($r = ESPHomeHubProtokoll::rahmenLesen($this->puffer)) !== null) {
             $this->empfangen[] = $r[1];
+            if ($r[1] === 1) {
+                $this->clientInfo = ESPHomeHubProtokoll::text(ESPHomeHubProtokoll::zerlegen($r[2]), 1);
+            }
             $antwort = match ($r[1]) {
                 1 => ESPHomeHubProtokoll::klartextRahmen(2, ESPHomeHubProtokoll::feldZahl(1, 1) . ESPHomeHubProtokoll::feldZahl(2, 19) . ESPHomeHubProtokoll::feldText(4, 'sim')),
                 9 => ESPHomeHubProtokoll::klartextRahmen(10, ESPHomeHubProtokoll::feldText(2, 'sim') . ESPHomeHubProtokoll::feldText(4, '2026.10.1') . ESPHomeHubProtokoll::feldText(6, 'esp32dev') . ESPHomeHubProtokoll::feldText(13, 'Simulator Küche')),
@@ -359,6 +368,25 @@ pruefe(zustand()['status'] === 102 && zustand()['a']['Gesperrt'] === false, 'Üb
 $GLOBALS['Z'][10000]['p']['Host'] = 'weg.local';
 geraet()->ApplyChanges();
 pruefe(zustand()['status'] === 203, 'nicht erreichbar: Status 203');
+
+// Langer Instanzname mit Umlaut an der Schnittgrenze: Gerät kürzt client_info auf 31 Byte (live 28.10.2026)
+$GLOBALS['NAME'] = 'ESPHome-Test (Claude, löschen)';
+$GLOBALS['Z'][10000]['p']['Host'] = 'sim.local';
+geraet()->ApplyChanges();
+pumpen();
+pruefe(strlen($sim->clientInfo) <= 31 && mb_check_encoding($sim->clientInfo, 'UTF-8') && $sim->clientInfo === 'Symcon ESPHome-Test (Claude, l', 'client_info ≤ 31 Byte, an der Zeichengrenze gekürzt: ' . $sim->clientInfo);
+
+// Instanz per Skript angelegt: kein Client Socket → Wache legt ihn an, benennt ihn, verbindet
+$GLOBALS['NAME'] = 'Flur';
+$GLOBALS['VERBUNDEN_MIT'] = 0;
+$sim->empfangen = [];
+geraet()->Wache();
+pumpen();
+pruefe(($GLOBALS['ANGELEGT'] ?? 0) === 1 && $GLOBALS['VERBUNDEN_MIT'] === 20000, 'fehlender Client Socket wird angelegt und verbunden');
+pruefe($GLOBALS['SOCKET']['name'] === 'ESPHome-Verbindung (Flur)', 'namenloser Socket wird benannt');
+pruefe($sim->empfangen === [1, 9] && zustand()['status'] === 102, 'danach verbunden');
+geraet()->Wache();
+pruefe(($GLOBALS['ANGELEGT'] ?? 0) === 1, 'vorhandener Socket: kein zweiter');
 
 // ------------------------------------------------------------------ 5. Store-Regeln
 abschnitt('Store-Regeln');

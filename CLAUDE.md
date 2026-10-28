@@ -42,8 +42,11 @@
 ## Offen / am echten Gerät prüfen
 
 - Kein echter ESP32/ESP8266 getestet, nur Host-Plattform auf dem Mac.
-- Modul noch nie in Symcon geladen (kein Repo). Erst nach Freigabe: Repo anlegen, beta pushen,
-  über die Modulverwaltung installieren, gegen das Host-Gerät testen (Mac nur über seine VPN-Tunneladresse erreichbar).
+- **Live 28.10.2026 (0.1.0, Dietmars Symcon 9.0):** über die Modulverwaltung installiert, Test-Instanz gegen das
+  Host-Gerät: verbunden (102), Geräteinfo, Ping beantwortet, falscher Schlüssel → 201 mit Meldung und Socket zu,
+  Gerät weg → 203 + Verbunden=false, Gerät wieder da → nach ~14 s verbunden (Wache). Funde → 0.1.1:
+  `RequireParent` legt bei per Skript erzeugten Instanzen keinen Socket an (jetzt die Wache), per Skript
+  erzeugter Socket heißt "" (wird jetzt benannt), Gerät kürzt client_info auf 31 Byte mitten im Umlaut.
 - Parallelbetrieb mit Home Assistant (mehrere Clients je Gerät).
 
 ## Prüfen vor jedem Push

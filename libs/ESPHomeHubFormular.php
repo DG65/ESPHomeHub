@@ -21,6 +21,9 @@ trait ESPHomeHubFormular
             '• Verschlüsselte Verbindung mit dem Schlüssel aus der Geräte-YAML, Lebenszeichen und automatisches Wiederverbinden.',
             '• Geräteinfo (Name, Version, Modell, MAC) und eine Variable „Verbunden" je Gerät.',
         ],
+        '0.1.1' => [
+            '• Fehlt der Client Socket, legt das ESPHome-Gerät ihn selbst an und verbindet ihn.',
+        ],
     ];
 
     private static $ESPHOMEHUB_REPO_URL     = 'https://github.com/DG65/ESPHomeHub';
