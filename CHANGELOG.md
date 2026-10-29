@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0 (29.10.2026)
+
+- ESPHome-Gerät: neues Panel „🪟 Formular: Aufbau" (DG65-Formular-Konvention, SUITE.md 3a). Je Bereich (Verbindung, Gerät, Entitäten) aufgeklappt, zugeklappt oder ausgeblendet und eine Position; Knopf „Auf Standard zurücksetzen". Ausgeblendete Bereiche bleiben im Formular und verlieren nichts.
+- Der Konfigurator hat nur zwei Fachpanels und bekommt das Panel nicht.
+
 ## 0.3.5 (28.10.2026)
 
 - Panel „Rückmeldungen": Link zum ESPHomeHub-Thread im Symcon-Forum, GitHub bleibt als zweiter Weg.

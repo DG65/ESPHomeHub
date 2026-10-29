@@ -87,6 +87,16 @@
 - **Nicht live mit einem echten ESPHome-Gerät im LAN geprüft:** im Heimnetz gibt es keins, das Host-Testgerät am Mac
   sendet sein mDNS nicht durch den VPN-Tunnel.
 
+## Formular: Aufbau (0.4.0, SUITE.md 3a)
+
+- Nur das ESPHome-Gerät (3 Fachpanels: `verbindung`, `geraet`, `entitaeten`); der Konfigurator hat 2 und
+  bekommt es nicht. Schlüssel stabil, Überschriften frei änderbar.
+- Umsetzung im Trait: `esphomehubFormular()` erkennt ein Fachpanel-Array mit Schlüsseln und wendet
+  `formLayout()` an; Property `FormLayout` und `ResetFormLayout()` liegen im Gerät. Ausgeblendet =
+  `visible:false`. Der „Neu"-Eintrag 0.4.0 nennt das Gerät ausdrücklich, weil der Konfigurator dieselbe
+  News-Liste zeigt.
+- Prüfstand Abschnitt 4c; Gegenprobe (Weglassen statt `visible:false`, ohne Sortierung) fällt durch.
+
 ## Offen / am echten Gerät prüfen
 
 - Kein echter ESP32/ESP8266 getestet, nur Host-Plattform auf dem Mac.

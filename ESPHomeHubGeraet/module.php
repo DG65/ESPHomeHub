@@ -51,6 +51,7 @@ class ESPHomeHubGeraet extends IPSModule
         // Modulverwaltung verloren (SUITE.md Stolperstein 5), der Schlüssel wird aber bei
         // JEDER Verbindung gebraucht. Im Formular als PasswordTextBox verdeckt.
         $this->RegisterPropertyString('Schluessel', '');
+        $this->RegisterPropertyString('FormLayout', '[]');
 
         $this->RegisterAttributeString('Geraet', '{}');
         $this->RegisterAttributeString('Verbindung', '{}');
@@ -708,7 +709,20 @@ class ESPHomeHubGeraet extends IPSModule
 
     public function GetConfigurationForm()
     {
-        return $this->esphomehubFormular([$this->formVerbindung(), $this->formGeraet(), $this->formEntitaeten()], [], $this->formStatus());
+        return $this->esphomehubFormular($this->fachpanels(), [], $this->formStatus());
+    }
+
+    /** Setzt Aufklapp-Zustand und Reihenfolge der Fachpanels im offenen Formular auf den Standard (gilt nach „Übernehmen"). */
+    public function ResetFormLayout(): string
+    {
+        $this->UpdateFormField('FormLayout', 'values', json_encode($this->formLayoutStandard($this->fachpanels()), JSON_UNESCAPED_UNICODE));
+        return 'ℹ️ Auf Standard gesetzt. Zum Speichern unten „Übernehmen" klicken.';
+    }
+
+    /** Fachpanels in Standardreihenfolge; die Schlüssel sind stabil (FormLayout), die Überschriften dürfen sich ändern. */
+    private function fachpanels(): array
+    {
+        return ['verbindung' => $this->formVerbindung(), 'geraet' => $this->formGeraet(), 'entitaeten' => $this->formEntitaeten()];
     }
 
     private function formVerbindung(): array

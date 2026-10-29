@@ -105,7 +105,7 @@ class IPSModule
     protected function UnregisterMessage($s, $m) { unset($this->z()['msg'][$s . ':' . $m]); }
     protected function SendDebug($t, $m, $f) { $GLOBALS['DEBUG'][] = "$t: $m"; }
     protected function LogMessage($m, $t) { $GLOBALS['LOG'][] = [$t, $m]; }
-    protected function UpdateFormField($f, $p, $v) {}
+    protected function UpdateFormField($f, $p, $v) { $GLOBALS['FORMFELD'][$f][$p] = $v; }
     protected function HasActiveParent() { return $GLOBALS['SOCKET']['status'] === IS_ACTIVE; }
     protected function SendDataToParent($json)
     {
@@ -696,6 +696,79 @@ ob_start();
 $k->Suchen();
 $echo = ob_get_clean();
 pruefe(str_contains($echo, '0 ESPHome-Geräte im Netz gefunden'), 'Knopf „Neu suchen" meldet das Ergebnis: ' . $echo);
+
+// ------------------------------------------------------------------ 4c. Formular: Aufbau (SUITE.md 3a)
+abschnitt('Formular: Aufbau (SUITE.md 3a)');
+$GLOBALS['Z'][10000]['p']['Host'] = 'sim.local';
+/** Titel der Panels in Formular-Reihenfolge, je ['caption', expanded, sichtbar]. */
+$panels = function (string $json): array {
+    $out = [];
+    foreach (json_decode($json, true)['elements'] as $e) {
+        if (($e['type'] ?? '') === 'ExpansionPanel') {
+            $out[] = [trim((string)preg_replace('/^[^\p{L}]+/u', '', $e['caption'])), $e['expanded'] ?? null, $e['visible'] ?? true];
+        }
+    }
+    return $out;
+};
+$titel = fn (array $p) => array_map(fn ($x) => preg_replace('/\s*\(.*$/u', '', $x[0]), $p);
+$fach = ['Verbindung', 'Gerät', 'Entitäten'];
+$nurFach = fn (array $p) => array_values(array_filter($p, fn ($x) => in_array(preg_replace('/\s*\(.*$/u', '', $x[0]), $fach, true)));
+
+$GLOBALS['Z'][10000]['p']['FormLayout'] = '[]';
+$p = $panels(geraet()->GetConfigurationForm());
+$t = $titel($p);
+$iAufbau = array_search('Formular: Aufbau', $t, true);
+$iRueck = array_search('Rückmeldungen', $t, true);
+$iEnt = array_search('Entitäten', $t, true);
+pruefe(array_column($nurFach($p), 0) === $fach, 'Standard: Fachpanels in Standardreihenfolge');
+pruefe($iAufbau !== false && $iAufbau === $iEnt + 1 && ($iRueck === false || $iRueck === $iAufbau + 1), 'Aufbau-Panel direkt nach den Fachpanels, vor dem Forum-Hinweis');
+pruefe($p[$iAufbau][1] === false, 'Aufbau-Panel standardmäßig eingeklappt');
+pruefe($nurFach($p)[0][1] === false && $nurFach($p)[1][1] === true, 'Standard-Aufklappen bleibt (Adresse da: Verbindung zu, Gerät auf)');
+
+$GLOBALS['Z'][10000]['p']['FormLayout'] = json_encode([
+    ['Key' => 'entitaeten', 'Opened' => true, 'Closed' => false, 'Hidden' => false, 'Pos' => 1],
+    ['Key' => 'geraet', 'Opened' => true, 'Closed' => false, 'Hidden' => true, 'Pos' => 2],
+    ['Key' => 'verbindung', 'Opened' => true, 'Closed' => true, 'Hidden' => false, 'Pos' => 3],
+    ['Key' => 'gibtsnicht', 'Hidden' => true, 'Pos' => 1],
+]);
+$json = geraet()->GetConfigurationForm();
+$f = $nurFach($panels($json));
+pruefe(array_column($f, 0) === ['Entitäten', 'Gerät', 'Verbindung'], 'Position bestimmt die Reihenfolge: ' . implode(', ', array_column($f, 0)));
+pruefe($f[0][1] === true, 'Aufgeklappt wirkt');
+pruefe($f[1][2] === false, 'Ausgeblendet = visible:false, Panel bleibt im Formular');
+pruefe($f[2][1] === false, 'Widerspruch Zugeklappt + Aufgeklappt → zugeklappt');
+$names = [];
+array_walk_recursive(json_decode($json, true)['elements'], function ($v, $k) use (&$names) { if ($k === 'name') { $names[] = $v; } });
+pruefe(in_array('Host', $names, true) && in_array('Schluessel', $names, true), 'Felder des ausgeblendeten Bereichs bleiben im Formular');
+$aufbau = null;
+foreach (json_decode($json, true)['elements'] as $e) {
+    if (str_contains((string)($e['caption'] ?? ''), 'Formular: Aufbau')) { $aufbau = $e; }
+}
+pruefe($aufbau !== null && str_contains($aufbau['caption'], '(1 ausgeblendet)'), 'Überschrift nennt die Zahl ausgeblendeter Bereiche');
+$liste = null;
+foreach ($aufbau['items'] ?? [] as $it) { if (($it['name'] ?? '') === 'FormLayout') { $liste = $it; } }
+pruefe($liste !== null && array_column($liste['values'], 'Key') === ['entitaeten', 'geraet', 'verbindung'], 'Liste zeigt nur bekannte Schlüssel, unbekannter fällt weg');
+$keySpalte = array_values(array_filter($liste['columns'] ?? [], fn ($c) => $c['name'] === 'Key'))[0] ?? [];
+pruefe(($keySpalte['visible'] ?? true) === false && ($keySpalte['save'] ?? false) === true, 'Schlüssel-Spalte unsichtbar mit save:true');
+
+$GLOBALS['Z'][10000]['p']['FormLayout'] = json_encode([['Key' => 'geraet', 'Pos' => 1], ['Key' => 'verbindung', 'Pos' => 1]]);
+$f = $nurFach($panels(geraet()->GetConfigurationForm()));
+pruefe(array_column($f, 0) === ['Verbindung', 'Gerät', 'Entitäten'], 'Gleiche Position → Standardreihenfolge, fehlender Schlüssel → Standardposition');
+$GLOBALS['Z'][10000]['p']['FormLayout'] = 'kaputt';
+pruefe(array_column($nurFach($panels(geraet()->GetConfigurationForm())), 0) === $fach, 'Unlesbare Einstellung → Standard');
+
+$GLOBALS['FORMFELD'] = [];
+$antwort = geraet()->ResetFormLayout();
+$zur = json_decode((string)($GLOBALS['FORMFELD']['FormLayout']['values'] ?? ''), true);
+pruefe(is_array($zur) && array_column($zur, 'Key') === ['verbindung', 'geraet', 'entitaeten'] && array_column($zur, 'Pos') === [1, 2, 3]
+    && !in_array(true, array_merge(array_column($zur, 'Opened'), array_column($zur, 'Closed'), array_column($zur, 'Hidden')), true), 'Zurücksetzen füllt die Liste mit dem Standard');
+pruefe(str_contains($antwort, 'Übernehmen') && zustand()['p']['FormLayout'] === 'kaputt', 'Zurücksetzen speichert nicht selbst, sondern verweist auf „Übernehmen"');
+$GLOBALS['Z'][10000]['p']['FormLayout'] = '[]';
+
+$kk = new ESPHomeHubKonfigurator(11500);
+$kk->Create();
+$kk->ApplyChanges();
+pruefe(!str_contains((string)$kk->GetConfigurationForm(), '"FormLayout"') && !str_contains((string)$kk->GetConfigurationForm(), '🪟  Formular: Aufbau'), 'Konfigurator (zwei Fachpanels) ohne Aufbau-Panel');
 
 // ------------------------------------------------------------------ 5. Store-Regeln
 abschnitt('Store-Regeln');

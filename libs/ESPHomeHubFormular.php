@@ -5,7 +5,8 @@ declare(strict_types=1);
 // ===========================================================================
 // Gemeinsame Formular-Bausteine aller ESPHomeHub-Module nach der DG65-Formular-
 // Konvention: „Wozu dieses Modul?" → „Neu bis Version" → „Dokumentation &
-// Hilfe" → Fachpanels → Rückmeldungs-Hinweis → „Über dieses Modul".
+// Hilfe" → Fachpanels → „Formular: Aufbau" (ab drei Fachpanels, SUITE.md 3a) →
+// Rückmeldungs-Hinweis → „Über dieses Modul".
 //
 // Trait mit Modul-Präfix im Namen: Klassen- und Trait-Namen sind in Symcon
 // prozessweit global. Jedes Modul liefert über esphomehubPrefix() seinen Präfix,
@@ -27,6 +28,9 @@ trait ESPHomeHubFormular
         '0.3.0' => [
             '• 🔍 Neu: ESPHome-Konfigurator — findet die Geräte im Netz und legt sie mit einem Klick an, die Spalte „Schlüssel" zeigt, welches Gerät einen braucht.',
             '• Geräte hinter VLAN- oder VPN-Grenzen lassen sich im Konfigurator von Hand eintragen.',
+        ],
+        '0.4.0' => [
+            '• 🪟 Neu: Formular-Aufbau selbst wählen — im ESPHome-Gerät legst du im Panel „Formular: Aufbau" fest, welche Bereiche beim Öffnen aufgeklappt, zugeklappt oder ausgeblendet sind und in welcher Reihenfolge sie stehen.',
         ],
         '0.2.0' => [
             '• 🧩 Sensoren, Schalter, Lichter, Rollläden, Lüfter, Schlösser, Klima und mehr werden automatisch zu Variablen — schaltbare direkt bedienbar.',
@@ -188,14 +192,120 @@ trait ESPHomeHubFormular
         ];
     }
 
-    /** Baut das komplette Formular aus Rahmen + Fachpanels. */
+    /**
+     * Baut das komplette Formular aus Rahmen + Fachpanels. Sind die Fachpanels mit Schlüsseln
+     * versehen (Schlüssel => Panel), wählt der Nutzer ihren Aufbau im Panel „Formular: Aufbau";
+     * das Modul braucht dann die Property „FormLayout" und eine öffentliche ResetFormLayout().
+     */
     protected function esphomehubFormular(array $fachpanels, array $aktionen, array $status): string
     {
+        $aufbau = [];
+        if (!array_is_list($fachpanels)) {
+            $layout = $this->formLayout(array_keys($fachpanels));
+            $mitte = [];
+            foreach ($layout as $key => $l) {
+                $panel = $fachpanels[$key];
+                if ($l['open'] === 'open') {
+                    $panel['expanded'] = true;
+                } elseif ($l['open'] === 'closed') {
+                    $panel['expanded'] = false;
+                } elseif ($l['open'] === 'hidden') {
+                    // Nicht weglassen: die Felder bleiben im Formular, gespeicherte Werte bleiben beim „Übernehmen" erhalten
+                    $panel['visible'] = false;
+                }
+                $mitte[] = $panel;
+            }
+            $aufbau = [$this->formAufbau($layout, $fachpanels)];
+            $fachpanels = $mitte;
+        }
         $elements = array_values(array_filter(array_merge(
             [$this->formZweck(), $this->formNeu(), $this->formDoku()],
             $fachpanels,
+            $aufbau,
             [$this->formRueckmeldung(), $this->formLizenz()]
         )));
         return (string)json_encode(['elements' => $elements, 'actions' => $aktionen, 'status' => $status]);
+    }
+
+    /**
+     * Reihenfolge und Aufklapp-Zustand der Fachpanels aus der Einstellung „FormLayout" (SUITE.md 3a,
+     * nach Batteriewächter). Unbekannte oder fehlende Einträge fallen auf Standard und Standardposition zurück.
+     *
+     * @param string[] $keys Schlüssel der Fachpanels in Standardreihenfolge
+     * @return array Schlüssel => ['open' => 'std'|'open'|'closed'|'hidden', 'pos' => int, 'idx' => int], sortiert
+     */
+    protected function formLayout(array $keys): array
+    {
+        $gespeichert = json_decode($this->ReadPropertyString('FormLayout'), true);
+        $nach = [];
+        foreach (is_array($gespeichert) ? $gespeichert : [] as $zeile) {
+            if (is_array($zeile) && isset($zeile['Key'])) {
+                $nach[(string)$zeile['Key']] = $zeile;
+            }
+        }
+        $out = [];
+        foreach (array_values($keys) as $i => $k) {
+            $r = $nach[$k] ?? [];
+            // Vorrang bei Widerspruch: ausgeblendet vor zugeklappt vor aufgeklappt, kein Haken = Standard
+            $open = !empty($r['Hidden']) ? 'hidden' : (!empty($r['Closed']) ? 'closed' : (!empty($r['Opened']) ? 'open' : 'std'));
+            $out[$k] = ['open' => $open, 'pos' => isset($r['Pos']) ? max(1, min(99, (int)$r['Pos'])) : $i + 1, 'idx' => $i];
+        }
+        uasort($out, fn ($a, $b) => [$a['pos'], $a['idx']] <=> [$b['pos'], $b['idx']]);
+        return $out;
+    }
+
+    /** Standardzeilen der Liste „FormLayout" (für ResetFormLayout). */
+    protected function formLayoutStandard(array $fachpanels): array
+    {
+        $zeilen = [];
+        foreach (array_keys($fachpanels) as $i => $k) {
+            $zeilen[] = ['Key' => $k, 'Panel' => $this->formPanelName($fachpanels[$k]), 'Opened' => false, 'Closed' => false, 'Hidden' => false, 'Pos' => $i + 1];
+        }
+        return $zeilen;
+    }
+
+    private function formPanelName(array $panel): string
+    {
+        return trim((string)preg_replace('/\s*\(.*$/u', '', (string)($panel['caption'] ?? '')));
+    }
+
+    /** Panel „Formular: Aufbau": je Fachpanel Aufklapp-Zustand beim Öffnen und Position. */
+    private function formAufbau(array $layout, array $fachpanels): array
+    {
+        $zeilen = [];
+        $versteckt = [];
+        foreach ($layout as $key => $l) {
+            $name = $this->formPanelName($fachpanels[$key]);
+            $zeilen[] = ['Key' => $key, 'Panel' => $name, 'Opened' => $l['open'] === 'open', 'Closed' => $l['open'] === 'closed',
+                'Hidden' => $l['open'] === 'hidden', 'Pos' => $l['pos']];
+            if ($l['open'] === 'hidden') {
+                $versteckt[] = trim((string)preg_replace('/^[^\p{L}\p{N}]+/u', '', $name));
+            }
+        }
+        $versteckZeile = $versteckt
+            ? [['type' => 'Label', 'caption' => '🙈 Ausgeblendet: ' . implode(', ', $versteckt) . ' — zum Wiederzeigen den Haken bei „Ausgeblendet" entfernen. Ausgeblendete Bereiche arbeiten weiter, nur die Anzeige fehlt.']]
+            : [];
+        return [
+            'type' => 'ExpansionPanel', 'expanded' => false,
+            'caption' => '🪟  Formular: Aufbau' . ($versteckt ? ' (' . count($versteckt) . ' ausgeblendet)' : ''),
+            'items' => array_merge($versteckZeile, [
+                ['type' => 'Label', 'caption' => 'Hier legst du fest, welche Bereiche beim Öffnen des Formulars aufgeklappt sind und in welcher Reihenfolge sie stehen. Symcon merkt sich das Auf- und Zuklappen nicht selbst, deshalb gilt die Einstellung hier jedes Mal beim Öffnen. Sie wirkt nach „Übernehmen" beim nächsten Öffnen des Formulars.'],
+                ['type' => 'Label', 'caption' => 'Kein Haken heißt „Standard": wie das Modul es vorsieht (z. B. „Verbindung" aufgeklappt, solange keine Adresse eingetragen ist, danach „Gerät"). Die Position ist eine Zahl; bei gleicher Zahl bleibt die Standardreihenfolge. „Ausgeblendet" nimmt einen Bereich aus der Anzeige, ohne dass er etwas verliert: seine Einstellungen bleiben erhalten und wirken weiter. Zum Wiederzeigen den Haken entfernen oder „Auf Standard zurücksetzen" klicken. Sind mehrere Haken gesetzt, gilt „Ausgeblendet" vor „Zugeklappt" vor „Aufgeklappt". Die Bereiche oben (Zweck, Neu, Dokumentation) und unten (Rückmeldungen, Über dieses Modul) bleiben, wo sie sind, und lassen sich nicht ausblenden.'],
+                [
+                    'type' => 'List', 'name' => 'FormLayout', 'caption' => 'Bereiche', 'rowCount' => count($zeilen), 'add' => false, 'delete' => false,
+                    'loadValuesFromConfiguration' => false,
+                    'values' => $zeilen,
+                    'columns' => [
+                        ['caption' => 'Bereich', 'name' => 'Panel', 'width' => 'auto', 'add' => ''],
+                        ['caption' => 'Schlüssel', 'name' => 'Key', 'width' => '0px', 'visible' => false, 'add' => '', 'save' => true],
+                        ['caption' => 'Aufgeklappt', 'name' => 'Opened', 'width' => '110px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
+                        ['caption' => 'Zugeklappt', 'name' => 'Closed', 'width' => '110px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
+                        ['caption' => '🙈 Ausgeblendet', 'name' => 'Hidden', 'width' => '130px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
+                        ['caption' => 'Position', 'name' => 'Pos', 'width' => '100px', 'add' => 1, 'edit' => ['type' => 'NumberSpinner', 'minimum' => 1, 'maximum' => 99]],
+                    ],
+                ],
+                ['type' => 'Button', 'caption' => '↩️ Auf Standard zurücksetzen', 'onClick' => 'echo ' . $this->esphomehubPrefix() . '_ResetFormLayout($id);'],
+            ]),
+        ];
     }
 }

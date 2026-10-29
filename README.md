@@ -1,7 +1,7 @@
 # ESPHomeHub
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Modul Version](https://img.shields.io/badge/Modul-0.3.5-informational)
+![Modul Version](https://img.shields.io/badge/Modul-0.4.0-informational)
 ![Symcon Version](https://img.shields.io/badge/Symcon-9.0%2B-informational)
 ![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange)
 [![Check Style](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml/badge.svg)](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml)
@@ -17,7 +17,7 @@ ein Licht oder einen Bluetooth-Proxy. Bisher ging das in Symcon nur über MQTT a
 ESPHomeHub spricht das Gerät so an wie Home Assistant: eine TCP-Verbindung je Gerät, das Gerät
 beschreibt sich selbst, Änderungen kommen sofort.
 
-**Stand 0.3.5:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
+**Stand 0.4.0:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
 Wiederverbinden, Geräteinfo und alle gängigen Entitäten als Variablen. Der Bluetooth-Proxy wird
 ein eigenes Modul.
 
@@ -118,6 +118,14 @@ ESPH_GetEntities($id);     // JSON: alle Entitäten mit Typ, Name, Fähigkeiten;
 ESPHC_GetDevices($id);     // Konfigurator: gefundene Geräte als JSON
 ESPH_Neuverbinden($id);
 ```
+
+## Formular: Aufbau
+
+Im ESPHome-Gerät legt das Panel „🪟 Formular: Aufbau" fest, welche der Bereiche Verbindung, Gerät
+und Entitäten beim Öffnen aufgeklappt, zugeklappt oder ausgeblendet sind und in welcher
+Reihenfolge sie stehen. Kein Haken heißt Standard. Ein ausgeblendeter Bereich behält seine
+Einstellungen und arbeitet weiter. „↩️ Auf Standard zurücksetzen" stellt alles zurück, gespeichert
+wird mit „Übernehmen".
 
 ## Zum Schlüssel
 
