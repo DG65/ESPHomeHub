@@ -97,6 +97,19 @@
   News-Liste zeigt.
 - Prüfstand Abschnitt 4c; Gegenprobe (Weglassen statt `visible:false`, ohne Sortierung) fällt durch.
 
+## Sprache (0.5.0)
+
+- Quelltexte englisch, Deutsch in `libs/locale.json` → `php .tools/locale-bauen.php` kopiert sie in beide Modulordner (Prüfstand
+  vergleicht). Bibliotheken übersetzen über `ESPHomeHubText::t('English %s', …)`, den Übersetzer setzt jedes Modul im Konstruktor
+  (`$this->Translate`). Das Formular läuft am Ende durch `formUebersetzen()` (alle `caption`), Texte mit Werten übersetzt die Stelle selbst.
+- **Kennungen bleiben deutsch:** Idents (`Verbunden`, `e…_h`), Funktionsnamen, Property-/Attribut-/Listenfeldnamen (`Adresse`!),
+  JSON-Schlüssel von GetDeviceInfo/GetEntities, Aliase. Logik nie an angezeigten Text hängen. Debug-Ausgaben bleiben deutsch.
+- Englische Schlüssel müssen eindeutig sein: „Open" = Öffnen (Befehl), „Opened" = Offen (Zustand); „Light" = Licht, „Bright" = Hell;
+  „Dehumidify" = Entfeuchten, „Dry" = Trocken.
+- Prüfstand läuft deutsch (wie Dietmars Symcon); Abschnitt 7 prüft statisch, dass jeder Text im Code in locale.json steht und kein
+  deutscher Text mehr im Code ist. Englischer Lauf: `ESPHOMEHUB_SPRACHE=en php .tools/test-esphomehub.php` (deutsche Prüftexte
+  schlagen dort erwartungsgemäß fehl; `ESPHOMEHUB_FORMULAR=datei.json` schreibt das Geräteformular zum Ansehen).
+
 ## Offen / am echten Gerät prüfen
 
 - Kein echter ESP32/ESP8266 getestet, nur Host-Plattform auf dem Mac.

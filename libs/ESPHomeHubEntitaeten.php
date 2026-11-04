@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/ESPHomeHubText.php';
+
 require_once __DIR__ . '/ESPHomeHubProtokoll.php';
 
 // ===========================================================================
@@ -50,27 +52,27 @@ final class ESPHomeHubEntitaeten
     ];
 
     public const TYP_NAMEN = [
-        'binary_sensor' => 'Binärsensor', 'cover' => 'Abdeckung', 'fan' => 'Lüfter', 'light' => 'Licht',
-        'sensor' => 'Sensor', 'switch' => 'Schalter', 'text_sensor' => 'Textsensor', 'climate' => 'Klima',
-        'number' => 'Zahl', 'select' => 'Auswahl', 'lock' => 'Schloss', 'button' => 'Knopf', 'text' => 'Text',
-        'event' => 'Ereignis', 'valve' => 'Ventil',
+        'binary_sensor' => 'Binary sensor', 'cover' => 'Cover', 'fan' => 'Fan', 'light' => 'Light',
+        'sensor' => 'Sensor', 'switch' => 'Switch', 'text_sensor' => 'Text sensor', 'climate' => 'Climate',
+        'number' => 'Number', 'select' => 'Select', 'lock' => 'Lock', 'button' => 'Button', 'text' => 'Text',
+        'event' => 'Event', 'valve' => 'Valve',
     ];
 
-    private const KLIMA_MODI = [0 => 'Aus', 1 => 'Heizen/Kühlen', 2 => 'Kühlen', 3 => 'Heizen', 4 => 'Nur Lüften', 5 => 'Entfeuchten', 6 => 'Automatik'];
-    private const KLIMA_AKTION = [0 => 'Aus', 2 => 'Kühlt', 3 => 'Heizt', 4 => 'Leerlauf', 5 => 'Entfeuchtet', 6 => 'Lüftet', 7 => 'Taut ab'];
-    private const SCHLOSS = [0 => 'Unbekannt', 1 => 'Verriegelt', 2 => 'Entriegelt', 3 => 'Blockiert', 4 => 'Verriegelt …', 5 => 'Entriegelt …', 6 => 'Öffnet …', 7 => 'Offen'];
-    private const BEWEGUNG = [0 => 'Steht', 1 => 'Öffnet', 2 => 'Schließt'];
+    private const KLIMA_MODI = [0 => 'Off', 1 => 'Heat/cool', 2 => 'Cool', 3 => 'Heat', 4 => 'Fan only', 5 => 'Dehumidify', 6 => 'Auto'];
+    private const KLIMA_AKTION = [0 => 'Off', 2 => 'Cooling', 3 => 'Heating', 4 => 'Idle', 5 => 'Drying', 6 => 'Ventilating', 7 => 'Defrosting'];
+    private const SCHLOSS = [0 => 'Unknown', 1 => 'Locked', 2 => 'Unlocked', 3 => 'Jammed', 4 => 'Locking …', 5 => 'Unlocking …', 6 => 'Opening …', 7 => 'Opened'];
+    private const BEWEGUNG = [0 => 'Stopped', 1 => 'Opening', 2 => 'Closing'];
 
     /** Klartext für binary_sensor je device_class: [aus, an] */
     private const BINAER = [
-        'door' => ['Geschlossen', 'Offen'], 'window' => ['Geschlossen', 'Offen'], 'garage_door' => ['Geschlossen', 'Offen'],
-        'opening' => ['Geschlossen', 'Offen'], 'lock' => ['Verriegelt', 'Entriegelt'], 'motion' => ['Keine Bewegung', 'Bewegung'],
-        'occupancy' => ['Frei', 'Belegt'], 'presence' => ['Abwesend', 'Anwesend'], 'moisture' => ['Trocken', 'Nass'],
-        'smoke' => ['Kein Rauch', 'Rauch'], 'gas' => ['Kein Gas', 'Gas'], 'problem' => ['OK', 'Problem'],
-        'connectivity' => ['Getrennt', 'Verbunden'], 'battery' => ['Normal', 'Schwach'], 'power' => ['Aus', 'An'],
-        'plug' => ['Ausgesteckt', 'Eingesteckt'], 'running' => ['Läuft nicht', 'Läuft'], 'vibration' => ['Ruhig', 'Vibration'],
-        'light' => ['Dunkel', 'Hell'], 'heat' => ['Normal', 'Heiß'], 'cold' => ['Normal', 'Kalt'], 'tamper' => ['OK', 'Manipuliert'],
-        'safety' => ['Sicher', 'Unsicher'], 'sound' => ['Ruhig', 'Geräusch'], 'update' => ['Aktuell', 'Update verfügbar'],
+        'door' => ['Closed', 'Opened'], 'window' => ['Closed', 'Opened'], 'garage_door' => ['Closed', 'Opened'],
+        'opening' => ['Closed', 'Opened'], 'lock' => ['Locked', 'Unlocked'], 'motion' => ['No motion', 'Motion'],
+        'occupancy' => ['Clear', 'Occupied'], 'presence' => ['Away', 'Home'], 'moisture' => ['Dry', 'Wet'],
+        'smoke' => ['No smoke', 'Smoke'], 'gas' => ['No gas', 'Gas'], 'problem' => ['OK', 'Problem'],
+        'connectivity' => ['Disconnected', 'Connected'], 'battery' => ['Normal', 'Low'], 'power' => ['Off', 'On'],
+        'plug' => ['Unplugged', 'Plugged in'], 'running' => ['Not running', 'Running'], 'vibration' => ['Calm', 'Vibration'],
+        'light' => ['Dark', 'Bright'], 'heat' => ['Normal', 'Hot'], 'cold' => ['Normal', 'Cold'], 'tamper' => ['OK', 'Tampered'],
+        'safety' => ['Safe', 'Unsafe'], 'sound' => ['Calm', 'Sound'], 'update' => ['Up to date', 'Update available'],
     ];
 
     // ------------------------------------------------------------------ Beschreibung
@@ -180,8 +182,8 @@ final class ESPHomeHubEntitaeten
             case 'sensor':
                 return [$v('', $name, VARIABLETYPE_FLOAT, $anzeige(['DIGITS' => (int)$e['nachkomma']] + ($e['einheit'] !== '' ? ['SUFFIX' => ' ' . $e['einheit']] : [])), false)];
             case 'binary_sensor':
-                [$aus, $an] = self::BINAER[$e['klasse']] ?? ['Aus', 'An'];
-                return [$v('', $name, VARIABLETYPE_BOOLEAN, $anzeige(['OPTIONS' => self::wertanzeige([[false, $aus], [true, $an]])]), false)];
+                [$aus, $an] = self::BINAER[$e['klasse']] ?? ['Off', 'On'];
+                return [$v('', $name, VARIABLETYPE_BOOLEAN, $anzeige(['OPTIONS' => self::wertanzeige([[false, ESPHomeHubText::t($aus)], [true, ESPHomeHubText::t($an)]])]), false)];
             case 'text_sensor':
                 return [$v('', $name, VARIABLETYPE_STRING, $anzeige(), false)];
             case 'event':
@@ -189,7 +191,7 @@ final class ESPHomeHubEntitaeten
             case 'switch':
                 return [$v('', $name, VARIABLETYPE_BOOLEAN, ['PRESENTATION' => VARIABLE_PRESENTATION_SWITCH], true)];
             case 'button':
-                return [$v('', $name, VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung([0 => 'Auslösen'])], true)];
+                return [$v('', $name, VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung([0 => ESPHomeHubText::t('Press')])], true)];
             case 'number':
                 $einheit = $e['einheit'] !== '' ? ' ' . $e['einheit'] : '';
                 if ($e['eingabe']) {
@@ -204,13 +206,13 @@ final class ESPHomeHubEntitaeten
             case 'light':
                 $out = [$v('', $name, VARIABLETYPE_BOOLEAN, ['PRESENTATION' => VARIABLE_PRESENTATION_SWITCH], true)];
                 if ($e['helligkeit']) {
-                    $out[] = $v('h', $name . ' Helligkeit', VARIABLETYPE_INTEGER, $prozent, true);
+                    $out[] = $v('h', $name . ' ' . ESPHomeHubText::t('Brightness'), VARIABLETYPE_INTEGER, $prozent, true);
                 }
                 if ($e['rgb']) {
-                    $out[] = $v('f', $name . ' Farbe', VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_COLOR, 'ENCODING' => 0], true);
+                    $out[] = $v('f', $name . ' ' . ESPHomeHubText::t('Color'), VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_COLOR, 'ENCODING' => 0], true);
                 }
                 if ($e['farbtemp'] && $e['minMired'] > 0 && $e['maxMired'] > 0) {
-                    $out[] = $v('k', $name . ' Farbtemperatur', VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_SLIDER,
+                    $out[] = $v('k', $name . ' ' . ESPHomeHubText::t('Color temperature'), VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_SLIDER,
                         'MIN' => (int)round(1e6 / $e['maxMired']), 'MAX' => (int)round(1e6 / $e['minMired']), 'STEP_SIZE' => 50, 'SUFFIX' => ' K'], true);
                 }
                 return $out;
@@ -218,46 +220,46 @@ final class ESPHomeHubEntitaeten
             case 'valve':
                 $out = [];
                 if ($e['position']) {
-                    $out[] = $v('', $name . ' (offen)', VARIABLETYPE_INTEGER, $prozent, true);
+                    $out[] = $v('', $name . ' ' . ESPHomeHubText::t('(open)'), VARIABLETYPE_INTEGER, $prozent, true);
                 } else {
-                    $out[] = $v('', $name, VARIABLETYPE_BOOLEAN, $anzeige(['OPTIONS' => self::wertanzeige([[false, 'Geschlossen'], [true, 'Offen']])]), false);
+                    $out[] = $v('', $name, VARIABLETYPE_BOOLEAN, $anzeige(['OPTIONS' => self::wertanzeige([[false, ESPHomeHubText::t('Closed')], [true, ESPHomeHubText::t('Opened')]])]), false);
                 }
-                $out[] = $v('s', $name . ' Steuerung', VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION,
-                    'OPTIONS' => self::aufzaehlung($e['stopp'] ? [0 => 'Öffnen', 1 => 'Stopp', 2 => 'Schließen'] : [0 => 'Öffnen', 2 => 'Schließen'])], true);
-                $out[] = $v('z', $name . ' Bewegung', VARIABLETYPE_STRING, $anzeige(), false);
+                $out[] = $v('s', $name . ' ' . ESPHomeHubText::t('Control'), VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION,
+                    'OPTIONS' => self::aufzaehlung($e['stopp'] ? [0 => ESPHomeHubText::t('Open'), 1 => ESPHomeHubText::t('Stop'), 2 => ESPHomeHubText::t('Close')] : [0 => ESPHomeHubText::t('Open'), 2 => ESPHomeHubText::t('Close')])], true);
+                $out[] = $v('z', $name . ' ' . ESPHomeHubText::t('Movement'), VARIABLETYPE_STRING, $anzeige(), false);
                 return $out;
             case 'fan':
                 $out = [$v('', $name, VARIABLETYPE_BOOLEAN, ['PRESENTATION' => VARIABLE_PRESENTATION_SWITCH], true)];
                 if ($e['stufen'] > 0) {
-                    $out[] = $v('g', $name . ' Stufe', VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_SLIDER, 'MIN' => 1, 'MAX' => (int)$e['stufen'], 'STEP_SIZE' => 1], true);
+                    $out[] = $v('g', $name . ' ' . ESPHomeHubText::t('Speed'), VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_SLIDER, 'MIN' => 1, 'MAX' => (int)$e['stufen'], 'STEP_SIZE' => 1], true);
                 }
                 return $out;
             case 'lock':
-                $out = [$v('', $name . ' verriegelt', VARIABLETYPE_BOOLEAN, ['PRESENTATION' => VARIABLE_PRESENTATION_SWITCH], true)];
+                $out = [$v('', $name . ' ' . ESPHomeHubText::t('locked'), VARIABLETYPE_BOOLEAN, ['PRESENTATION' => VARIABLE_PRESENTATION_SWITCH], true)];
                 if ($e['oeffnen']) {
-                    $out[] = $v('s', $name . ' öffnen', VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung([2 => 'Öffnen'])], true);
+                    $out[] = $v('s', $name . ' ' . ESPHomeHubText::t('open'), VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung([2 => ESPHomeHubText::t('Open')])], true);
                 }
-                $out[] = $v('z', $name . ' Zustand', VARIABLETYPE_STRING, $anzeige(), false);
+                $out[] = $v('z', $name . ' ' . ESPHomeHubText::t('State'), VARIABLETYPE_STRING, $anzeige(), false);
                 return $out;
             case 'climate':
                 $temp = fn (string $teil, string $n) => $v($teil, $n, VARIABLETYPE_FLOAT, ['PRESENTATION' => VARIABLE_PRESENTATION_SLIDER, 'MIN' => (float)($e['min'] ?: 5), 'MAX' => (float)($e['max'] ?: 35),
                     'STEP_SIZE' => (float)($e['schritt'] ?: 0.5), 'DIGITS' => max(1, self::stellen((float)$e['schritt'])), 'SUFFIX' => ' °C'], true);
                 $modi = [];
                 foreach ($e['modi'] as $mod) {
-                    $modi[$mod] = self::KLIMA_MODI[$mod] ?? ('Modus ' . $mod);
+                    $modi[$mod] = isset(self::KLIMA_MODI[$mod]) ? ESPHomeHubText::t(self::KLIMA_MODI[$mod]) : ESPHomeHubText::t('Mode %s', $mod);
                 }
-                $out = [$v('m', $name . ' Betriebsart', VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung($modi)], true)];
+                $out = [$v('m', $name . ' ' . ESPHomeHubText::t('Mode'), VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung($modi)], true)];
                 if ($e['zweiPunkt']) {
-                    $out[] = $temp('u', $name . ' Solltemperatur unten');
-                    $out[] = $temp('o', $name . ' Solltemperatur oben');
+                    $out[] = $temp('u', $name . ' ' . ESPHomeHubText::t('Target temperature low'));
+                    $out[] = $temp('o', $name . ' ' . ESPHomeHubText::t('Target temperature high'));
                 } else {
-                    $out[] = $temp('', $name . ' Solltemperatur');
+                    $out[] = $temp('', $name . ' ' . ESPHomeHubText::t('Target temperature'));
                 }
                 if ($e['ist']) {
-                    $out[] = $v('t', $name . ' Ist-Temperatur', VARIABLETYPE_FLOAT, $anzeige(['DIGITS' => 1, 'SUFFIX' => ' °C']), false);
+                    $out[] = $v('t', $name . ' ' . ESPHomeHubText::t('Current temperature'), VARIABLETYPE_FLOAT, $anzeige(['DIGITS' => 1, 'SUFFIX' => ' °C']), false);
                 }
                 if ($e['aktion']) {
-                    $out[] = $v('a', $name . ' Tätigkeit', VARIABLETYPE_STRING, $anzeige(), false);
+                    $out[] = $v('a', $name . ' ' . ESPHomeHubText::t('Action'), VARIABLETYPE_STRING, $anzeige(), false);
                 }
                 return $out;
         }
@@ -357,7 +359,7 @@ final class ESPHomeHubEntitaeten
                 $bewegung = $e['typ'] === 'cover' ? $P::zahl($m, 5) : $P::zahl($m, 3);
                 return [
                     $i() => $e['position'] ? (int)round($pos * 100) : $pos > 0,
-                    $i('z') => self::BEWEGUNG[$bewegung] ?? ('Zustand ' . $bewegung),
+                    $i('z') => isset(self::BEWEGUNG[$bewegung]) ? ESPHomeHubText::t(self::BEWEGUNG[$bewegung]) : ESPHomeHubText::t('State %s', $bewegung),
                 ];
             case 'fan':
                 $out = [$i() => $P::bool($m, 2)];
@@ -367,7 +369,7 @@ final class ESPHomeHubEntitaeten
                 return $out;
             case 'lock':
                 $s = $P::zahl($m, 2);
-                $out = [$i('z') => self::SCHLOSS[$s] ?? ('Zustand ' . $s)];
+                $out = [$i('z') => isset(self::SCHLOSS[$s]) ? ESPHomeHubText::t(self::SCHLOSS[$s]) : ESPHomeHubText::t('State %s', $s)];
                 if ($s === 1) {
                     $out[$i()] = true;
                 } elseif ($s === 2 || $s === 7) {
@@ -390,7 +392,7 @@ final class ESPHomeHubEntitaeten
                 }
                 if ($e['aktion']) {
                     $a = $P::zahl($m, 8);
-                    $out[$i('a')] = self::KLIMA_AKTION[$a] ?? ('Zustand ' . $a);
+                    $out[$i('a')] = isset(self::KLIMA_AKTION[$a]) ? ESPHomeHubText::t(self::KLIMA_AKTION[$a]) : ESPHomeHubText::t('State %s', $a);
                 }
                 return $out;
         }
@@ -410,7 +412,7 @@ final class ESPHomeHubEntitaeten
         $listTyp = (int)array_search($e['typ'], array_map(fn ($t) => $t[0], self::TYPEN), true);
         $befehl = self::TYPEN[$listTyp][2] ?? 0;
         if ($befehl === 0) {
-            throw new InvalidArgumentException('„' . $e['name'] . '" lässt sich nicht schalten.');
+            throw new InvalidArgumentException(ESPHomeHubText::t('"%s" cannot be switched.', $e['name']));
         }
         $key = $P::feldFixed32(1, (int)$e['key']);
         $b = fn (int $f) => $P::feldBool($f, true);
@@ -422,12 +424,12 @@ final class ESPHomeHubEntitaeten
             case 'number/':
                 $w = (float)$wert;
                 if (($e['min'] != $e['max']) && ($w < $e['min'] || $w > $e['max'])) {
-                    throw new InvalidArgumentException('Wert ' . $w . ' liegt außerhalb ' . $e['min'] . '–' . $e['max'] . '.');
+                    throw new InvalidArgumentException(ESPHomeHubText::t('Value %s is outside %s–%s.', $w, $e['min'], $e['max']));
                 }
                 return [$befehl, $key . $P::feldFloat(2, $w), null];
             case 'select/':
                 if (!in_array((string)$wert, $e['optionen'], true)) {
-                    throw new InvalidArgumentException('„' . $wert . '" ist keine Option von „' . $e['name'] . '".');
+                    throw new InvalidArgumentException(ESPHomeHubText::t('"%s" is not an option of "%s".', $wert, $e['name']));
                 }
                 return [$befehl, $key . $P::feldText(2, (string)$wert), null];
             case 'text/':
@@ -462,13 +464,13 @@ final class ESPHomeHubEntitaeten
             case 'lock/':
             case 'lock/s':
                 if ($e['code']) {
-                    throw new InvalidArgumentException('„' . $e['name'] . '" verlangt einen Code — das unterstützt ESPHomeHub noch nicht.');
+                    throw new InvalidArgumentException(ESPHomeHubText::t('"%s" requires a code — ESPHomeHub does not support that yet.', $e['name']));
                 }
                 $cmd = $teil === 's' ? 2 : ((bool)$wert ? 1 : 0);
                 return [$befehl, $key . $P::feldZahl(2, $cmd), $teil === 's' ? 2 : null];
             case 'climate/m':
                 if (!in_array((int)$wert, $e['modi'], true)) {
-                    throw new InvalidArgumentException('Betriebsart ' . $wert . ' kennt „' . $e['name'] . '" nicht.');
+                    throw new InvalidArgumentException(ESPHomeHubText::t('Mode %s is unknown to "%s".', $wert, $e['name']));
                 }
                 return [$befehl, $key . $b(2) . $P::feldZahl(3, (int)$wert), null];
             case 'climate/':
@@ -478,6 +480,6 @@ final class ESPHomeHubEntitaeten
             case 'climate/o':
                 return [$befehl, $key . $b(8) . $P::feldFloat(9, (float)$wert), null];
         }
-        throw new InvalidArgumentException('Unbekannte Aktion für „' . $e['name'] . '".');
+        throw new InvalidArgumentException(ESPHomeHubText::t('Unknown action for "%s".', $e['name']));
     }
 }

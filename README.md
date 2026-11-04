@@ -1,14 +1,16 @@
 # ESPHomeHub
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Modul Version](https://img.shields.io/badge/Modul-0.4.0-informational)
+![Modul Version](https://img.shields.io/badge/Modul-0.5.0-informational)
 ![Symcon Version](https://img.shields.io/badge/Symcon-9.0%2B-informational)
 ![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange)
 [![Check Style](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml/badge.svg)](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml)
 [![PayPal](https://img.shields.io/badge/PayPal-Spenden-blue?logo=paypal)](https://paypal.me/DietmarGureth)
 
-[ESPHome](https://esphome.io)-Geräte direkt in IP-Symcon — über ihre eigene Schnittstelle
+[ESPHome](https://esphome.io)-Geräte direkt in Symcon — über ihre eigene Schnittstelle
 (Native API), verschlüsselt, ohne MQTT-Server und ohne Home Assistant.
+
+[English version](README.en.md)
 
 ## Was tut dieses Modul?
 
@@ -17,9 +19,9 @@ ein Licht oder einen Bluetooth-Proxy. Bisher ging das in Symcon nur über MQTT a
 ESPHomeHub spricht das Gerät so an wie Home Assistant: eine TCP-Verbindung je Gerät, das Gerät
 beschreibt sich selbst, Änderungen kommen sofort.
 
-**Stand 0.4.0:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
-Wiederverbinden, Geräteinfo und alle gängigen Entitäten als Variablen. Der Bluetooth-Proxy wird
-ein eigenes Modul.
+**Stand 0.5.0:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
+Wiederverbinden, Geräteinfo und alle gängigen Entitäten als Variablen. Die Oberfläche folgt der
+Sprache von Symcon (Deutsch oder Englisch). Der Bluetooth-Proxy wird ein eigenes Modul.
 
 ## Aufbau
 

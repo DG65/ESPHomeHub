@@ -154,7 +154,7 @@ final class ESPHomeHubZeitzone
         if (($s[$p] ?? '') === '<') {
             $z = strpos($s, '>', $p);
             if ($z === false) {
-                throw new InvalidArgumentException('offene spitze Klammer');
+                throw new InvalidArgumentException('open angle bracket');
             }
             return $z + 1;
         }
@@ -163,7 +163,7 @@ final class ESPHomeHubZeitzone
             $p++;
         }
         if ($p - $a < 3) {
-            throw new InvalidArgumentException('Name zu kurz');
+            throw new InvalidArgumentException('name too short');
         }
         return $p;
     }
@@ -177,7 +177,7 @@ final class ESPHomeHubZeitzone
             $p++;
         }
         if ($p === $a) {
-            throw new InvalidArgumentException('Ziffer erwartet');
+            throw new InvalidArgumentException('digit expected');
         }
         return [$v, $p];
     }
@@ -211,30 +211,30 @@ final class ESPHomeHubZeitzone
             $r['typ'] = 1;
             [$r['monat'], $p] = self::zahl($s, $p + 1);
             if ($r['monat'] < 1 || $r['monat'] > 12 || ($s[$p] ?? '') !== '.') {
-                throw new InvalidArgumentException('Monat');
+                throw new InvalidArgumentException('month');
             }
             [$r['woche'], $p] = self::zahl($s, $p + 1);
             if ($r['woche'] < 1 || $r['woche'] > 5 || ($s[$p] ?? '') !== '.') {
-                throw new InvalidArgumentException('Woche');
+                throw new InvalidArgumentException('week');
             }
             [$r['wochentag'], $p] = self::zahl($s, $p + 1);
             if ($r['wochentag'] > 6) {
-                throw new InvalidArgumentException('Wochentag');
+                throw new InvalidArgumentException('weekday');
             }
         } elseif ($c === 'J' || $c === 'j') {
             $r['typ'] = 2;
             [$r['tag'], $p] = self::zahl($s, $p + 1);
             if ($r['tag'] < 1 || $r['tag'] > 365) {
-                throw new InvalidArgumentException('Julianischer Tag');
+                throw new InvalidArgumentException('Julian day');
             }
         } elseif (ctype_digit($c)) {
             $r['typ'] = 3;
             [$r['tag'], $p] = self::zahl($s, $p);
             if ($r['tag'] > 365) {
-                throw new InvalidArgumentException('Tag des Jahres');
+                throw new InvalidArgumentException('day of year');
             }
         } else {
-            throw new InvalidArgumentException('Regel erwartet');
+            throw new InvalidArgumentException('rule expected');
         }
         $r['zeit'] = 7200;
         if (($s[$p] ?? '') === '/') {

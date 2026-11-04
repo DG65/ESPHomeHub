@@ -30,6 +30,14 @@ class ESPHomeHubGeraet extends IPSModule
 {
     use ESPHomeHubFormular;
 
+    public function __construct($InstanceID)
+    {
+        parent::__construct($InstanceID);
+        // Quelltexte sind englisch; die Bibliotheken übersetzen über die locale.json dieses Moduls.
+        ESPHomeHubText::setzen(fn (string $text): string => $this->Translate($text));
+    }
+
+
     private const CLIENT_SOCKET = '{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}';
     private const DATA_ZUM_IO = '{79827379-F36E-4ADA-8A95-5F8D1DC92FA9}';
 
@@ -75,11 +83,11 @@ class ESPHomeHubGeraet extends IPSModule
             return;
         }
 
-        $this->MaintainVariable('Verbunden', 'Verbunden', VARIABLETYPE_BOOLEAN, [
+        $this->MaintainVariable('Verbunden', ESPHomeHubText::t('Connected'), VARIABLETYPE_BOOLEAN, [
             'PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION,
             'OPTIONS'      => (string)json_encode([
-                ['Value' => false, 'Caption' => 'Getrennt', 'IconActive' => false, 'IconValue' => '', 'ColorActive' => true, 'ColorValue' => 0xE53935],
-                ['Value' => true, 'Caption' => 'Verbunden', 'IconActive' => false, 'IconValue' => '', 'ColorActive' => true, 'ColorValue' => 0x43A047],
+                ['Value' => false, 'Caption' => ESPHomeHubText::t('Disconnected'), 'IconActive' => false, 'IconValue' => '', 'ColorActive' => true, 'ColorValue' => 0xE53935],
+                ['Value' => true, 'Caption' => ESPHomeHubText::t('Connected'), 'IconActive' => false, 'IconValue' => '', 'ColorActive' => true, 'ColorValue' => 0x43A047],
             ]),
         ], 1, true);
 
@@ -121,7 +129,7 @@ class ESPHomeHubGeraet extends IPSModule
             $this->SetStatus(self::STATUS_SCHLUESSEL_FALSCH);
             $this->SetTimerInterval('Wache', 0);
             $this->elternEinstellen(false);
-            $this->verbindungMerken(['zustand' => 'fehler', 'text' => 'Der Schlüssel ist kein gültiger ESPHome-Schlüssel (Base64, 32 Byte).']);
+            $this->verbindungMerken(['zustand' => 'fehler', 'text' => ESPHomeHubText::t('The key is not a valid ESPHome key (Base64, 32 bytes).')]);
             return;
         }
         $this->SetTimerInterval('Wache', self::WACHE_S * 1000);
@@ -149,7 +157,7 @@ class ESPHomeHubGeraet extends IPSModule
                 $this->sitzungVerwerfen();
                 if ((int)($Data[0] ?? 0) >= IS_EBASE && !$this->ReadAttributeBoolean('Gesperrt') && $this->host() !== '') {
                     $this->SetStatus(self::STATUS_UNERREICHBAR);
-                    $this->verbindungMerken(['zustand' => 'getrennt', 'text' => 'Gerät nicht erreichbar.']);
+                    $this->verbindungMerken(['zustand' => 'getrennt', 'text' => ESPHomeHubText::t('Device not reachable.')]);
                 }
             }
         }
@@ -187,7 +195,7 @@ class ESPHomeHubGeraet extends IPSModule
         }
         $letzter = (int)$this->GetBuffer('LetzterEmpfang');
         if ($letzter > 0 && time() - $letzter > self::STILLE_MAX_S) {
-            $this->LogMessage('Keine Antwort mehr vom Gerät seit ' . (time() - $letzter) . ' s — verbinde neu.', KL_WARNING);
+            $this->LogMessage(ESPHomeHubText::t('No answer from the device for %s s — reconnecting.', time() - $letzter), KL_WARNING);
             $this->elternEinstellen(true, true);
         }
     }
@@ -196,13 +204,13 @@ class ESPHomeHubGeraet extends IPSModule
     public function Neuverbinden(): void
     {
         if ($this->host() === '') {
-            echo '⛔ Erst eine IP-Adresse oder einen Hostnamen eintragen und übernehmen.';
+            echo ESPHomeHubText::t('⛔ First enter an IP address or host name and apply.');
             return;
         }
         $this->WriteAttributeBoolean('Gesperrt', false);
         $this->verbindungMerken(['zustand' => 'verbinde']);
         $this->elternEinstellen(true, true);
-        echo '🔄 Verbinde neu mit ' . $this->host() . ' … Ergebnis siehe Panel „Gerät" (Formular neu öffnen).';
+        echo ESPHomeHubText::t('🔄 Reconnecting to %s … see panel "Device" for the result (reopen the form).', $this->host());
     }
 
     /** Geräteinfo als JSON (Name, MAC, ESPHome-Version, Modell …); leer, solange nie verbunden. */
@@ -227,7 +235,7 @@ class ESPHomeHubGeraet extends IPSModule
         $ziel = ESPHomeHubEntitaeten::identLesen((string)$Ident);
         $e = $ziel === null ? null : ($this->entitaeten()[$ziel[0]] ?? null);
         if ($e === null) {
-            throw new Exception('Unbekannte Variable ' . $Ident . ' — das Gerät kennt diese Entität nicht (mehr).');
+            throw new Exception(ESPHomeHubText::t('Unknown variable %s — the device does not know this entity (any more).', $Ident));
         }
         try {
             [$typ, $daten, $sofort] = ESPHomeHubEntitaeten::befehl($e, $ziel[1], $Value);
@@ -235,7 +243,7 @@ class ESPHomeHubGeraet extends IPSModule
             throw new Exception($ex->getMessage());
         }
         if (!$this->nachrichtSenden($typ, $daten)) {
-            throw new Exception('„' . ($e['name'] ?: IPS_GetName($this->InstanceID)) . '" nicht gesendet: Gerät ist nicht verbunden.');
+            throw new Exception(ESPHomeHubText::t('"%s" not sent: device is not connected.', $e['name'] ?: IPS_GetName($this->InstanceID)));
         }
         $this->SendDebug('Befehl', $Ident . ' = ' . json_encode($Value), 0);
         // Knöpfe und Fahrbefehle haben keinen Zustand, den das Gerät zurückmeldet. Immer setzen,
@@ -300,7 +308,7 @@ class ESPHomeHubGeraet extends IPSModule
                     IPS_SetName($this->InstanceID, $anzeige);
                 }
                 if ($vorher === 'getrennt') {
-                    $this->LogMessage('Wieder verbunden mit ' . ($info['anzeigename'] ?: $info['name']) . '.', KL_MESSAGE);
+                    $this->LogMessage(ESPHomeHubText::t('Connected again to %s.', $info['anzeigename'] ?: $info['name']), KL_MESSAGE);
                 }
                 $this->SendDebug('Gerät', json_encode($info), 0);
                 return;
@@ -311,7 +319,7 @@ class ESPHomeHubGeraet extends IPSModule
             case 'getrennt':
                 // Gerät trennt selbst (Neustart, OTA-Update) — die Wache verbindet wieder.
                 $this->verbundenSetzen(false);
-                $this->verbindungMerken(['zustand' => 'getrennt', 'text' => 'Gerät hat die Verbindung beendet (Neustart oder Update).']);
+                $this->verbindungMerken(['zustand' => 'getrennt', 'text' => ESPHomeHubText::t('The device closed the connection (restart or update).')]);
                 return;
             case 'entitaetenFertig':
                 $this->entitaetenUebernehmen();
@@ -331,18 +339,18 @@ class ESPHomeHubGeraet extends IPSModule
         if ($art === 'protokoll') {
             // Kein Dauerzustand: die Wache baut die Sitzung neu auf.
             $this->verbindungMerken(['zustand' => 'getrennt', 'text' => 'Protokollfehler: ' . $text]);
-            $this->LogMessage('Protokollfehler, verbinde neu: ' . $text, KL_WARNING);
+            $this->LogMessage(ESPHomeHubText::t('Protocol error, reconnecting: %s', $text), KL_WARNING);
             $this->elternEinstellen(true, true);
             return;
         }
         // Schlüssel- und Verschlüsselungsfehler heilen nicht von selbst: Socket zu, bis der Nutzer etwas ändert.
         $hinweis = match ($art) {
-            'schluessel'       => $text . ' Den Schlüssel aus „api: encryption: key" der Geräte-YAML eintragen.',
-            'unverschluesselt' => $text . ' Schlüssel leer lassen oder im Gerät die Verschlüsselung einschalten.',
-            default            => $text . ' Den Schlüssel aus der Geräte-YAML eintragen.',
+            'schluessel'       => $text . ' ' . ESPHomeHubText::t('Enter the key from "api: encryption: key" of the device YAML.'),
+            'unverschluesselt' => $text . ' ' . ESPHomeHubText::t('Leave the key empty or turn on encryption in the device.'),
+            default            => $text . ' ' . ESPHomeHubText::t('Enter the key from the device YAML.'),
         };
         if (($server['name'] ?? '') !== '') {
-            $hinweis .= ' (Gerät meldet sich als „' . $server['name'] . '")';
+            $hinweis .= ' ' . ESPHomeHubText::t('(device reports as "%s")', $server['name']);
         }
         $this->WriteAttributeBoolean('Gesperrt', true);
         $this->SetStatus($art === 'schluessel' ? self::STATUS_SCHLUESSEL_FALSCH : self::STATUS_VERSCHLUESSELUNG);
@@ -469,7 +477,7 @@ class ESPHomeHubGeraet extends IPSModule
     {
         $eltern = $this->eltern();
         if ($eltern > 0 && in_array(IPS_GetName($eltern), ['', 'Client Socket', 'Client-Socket'], true)) {
-            IPS_SetName($eltern, 'ESPHome-Verbindung (' . IPS_GetName($this->InstanceID) . ')');
+            IPS_SetName($eltern, ESPHomeHubText::t('ESPHome connection (%s)', IPS_GetName($this->InstanceID)));
         }
     }
 
@@ -478,7 +486,7 @@ class ESPHomeHubGeraet extends IPSModule
     {
         $id = @IPS_CreateInstance(self::CLIENT_SOCKET);
         if (!$id) {
-            $this->verbindungMerken(['zustand' => 'fehler', 'text' => 'Client Socket ließ sich nicht anlegen.']);
+            $this->verbindungMerken(['zustand' => 'fehler', 'text' => ESPHomeHubText::t('Could not create the Client Socket.')]);
             return;
         }
         // Inzwischen doch verbunden (z. B. von der Konsole)? Dann den eigenen wieder entfernen.
@@ -486,7 +494,7 @@ class ESPHomeHubGeraet extends IPSModule
             @IPS_DeleteInstance($id);
             return;
         }
-        $this->LogMessage('Client Socket #' . $id . ' angelegt und verbunden.', KL_MESSAGE);
+        $this->LogMessage(ESPHomeHubText::t('Client Socket #%s created and connected.', $id), KL_MESSAGE);
         $this->socketBenennen();
         $this->elternBeobachten();
         $this->verbindungMerken(['zustand' => 'verbinde']);
@@ -536,7 +544,7 @@ class ESPHomeHubGeraet extends IPSModule
             $neu = json_decode($this->GetBuffer('EntitaetenNeu'), true) ?: ['liste' => [], 'fehlt' => []];
             $e = ESPHomeHubEntitaeten::beschreiben($typ, $daten);
             if ($e === null) {
-                $neu['fehlt'][] = ESPHomeHubEntitaeten::NICHT_UNTERSTUETZT[$typ] ?? ('Typ ' . $typ);
+                $neu['fehlt'][] = ESPHomeHubEntitaeten::NICHT_UNTERSTUETZT[$typ] ?? ESPHomeHubText::t('Type %s', $typ);
             } else {
                 $neu['liste'][] = $e;
             }
@@ -691,19 +699,19 @@ class ESPHomeHubGeraet extends IPSModule
     protected function esphomehubZweck(): array
     {
         return [
-            'Bindet ein ESPHome-Gerät direkt über seine eigene Schnittstelle (Native API) an — ohne MQTT-Server und ohne Home Assistant.',
-            'Adresse und Schlüssel aus der Geräte-YAML eintragen, übernehmen: die Instanz hält die Verbindung, beantwortet die Lebenszeichen des Geräts und verbindet nach einem Neustart selbst wieder.',
+            'Connects an ESPHome device directly through its own interface (Native API) — without an MQTT server and without Home Assistant.',
+            'Enter the address and the key from the device YAML and apply: the instance keeps the connection, answers the keep-alive messages of the device and reconnects by itself after a restart.',
         ];
     }
 
     protected function esphomehubDoku(): array
     {
         return [
-            'Das Gerät braucht in seiner YAML den Abschnitt „api:". Seit ESPHome 2026.1 gibt es dort nur noch den Schlüssel unter „encryption: key" (Base64, 44 Zeichen), kein Passwort mehr.',
-            'Port ist 6053, solange in der YAML unter „api:" kein anderer steht.',
-            'Ohne verbundenen Client startet ein ESPHome-Gerät nach „reboot_timeout" (Standard 15 Minuten) neu. Läuft parallel Home Assistant, darf das Gerät beide Verbindungen gleichzeitig halten.',
-            'Jede Entität des Geräts wird zu Variablen unter dieser Instanz, schaltbare mit Aktion. Der Ident ist der key der Entität (e + 8 Hex-Zeichen, Teilvariablen mit Endung wie _h für Helligkeit) und bleibt gleich, solange die id in der YAML gleich bleibt.',
-            'Entfernt man eine Entität aus der YAML, bleibt ihre Variable samt Archiv stehen und kann von Hand gelöscht werden.',
+            'The device needs the section "api:" in its YAML. Since ESPHome 2026.1 there is only the key under "encryption: key" (Base64, 44 characters), no password any more.',
+            'The port is 6053 unless another one is set under "api:" in the YAML.',
+            'Without a connected client, an ESPHome device restarts after "reboot_timeout" (default 15 minutes). If Home Assistant runs in parallel, the device may hold both connections at the same time.',
+            'Every entity of the device becomes variables below this instance, switchable ones with an action. The ident is the key of the entity (e + 8 hex characters, partial variables with a suffix such as _h for brightness) and stays the same as long as the id in the YAML stays the same.',
+            'If an entity is removed from the YAML, its variable and its archive remain and can be deleted manually.',
         ];
     }
 
@@ -716,7 +724,7 @@ class ESPHomeHubGeraet extends IPSModule
     public function ResetFormLayout(): string
     {
         $this->UpdateFormField('FormLayout', 'values', json_encode($this->formLayoutStandard($this->fachpanels()), JSON_UNESCAPED_UNICODE));
-        return 'ℹ️ Auf Standard gesetzt. Zum Speichern unten „Übernehmen" klicken.';
+        return ESPHomeHubText::t('ℹ️ Reset to default. Click "Apply" below to save.');
     }
 
     /** Fachpanels in Standardreihenfolge; die Schlüssel sind stabil (FormLayout), die Überschriften dürfen sich ändern. */
@@ -729,14 +737,14 @@ class ESPHomeHubGeraet extends IPSModule
     {
         $schluessel = trim($this->ReadPropertyString('Schluessel')) !== '';
         return [
-            'type' => 'ExpansionPanel', 'expanded' => $this->host() === '', 'caption' => '🔌  Verbindung',
+            'type' => 'ExpansionPanel', 'expanded' => $this->host() === '', 'caption' => '🔌  Connection',
             'items' => [
-                ['type' => 'ValidationTextBox', 'name' => 'Host', 'caption' => 'IP-Adresse oder Hostname (z. B. 192.168.1.50 oder wohnzimmer.local)'],
+                ['type' => 'ValidationTextBox', 'name' => 'Host', 'caption' => 'IP address or host name (e.g. 192.168.1.50 or livingroom.local)'],
                 ['type' => 'NumberSpinner', 'name' => 'Port', 'caption' => 'Port', 'minimum' => 1, 'maximum' => 65535],
-                ['type' => 'PasswordTextBox', 'name' => 'Schluessel', 'caption' => 'Schlüssel aus „api: encryption: key"'],
+                ['type' => 'PasswordTextBox', 'name' => 'Schluessel', 'caption' => 'Key from "api: encryption: key"'],
                 ['type' => 'Label', 'caption' => $schluessel
-                    ? '🔑 Schlüssel hinterlegt — die Verbindung ist verschlüsselt.'
-                    : 'ℹ️ Kein Schlüssel: nur für Geräte ohne „encryption:" in der YAML. Neue ESPHome-Projekte haben immer einen Schlüssel.'],
+                    ? '🔑 Key stored — the connection is encrypted.'
+                    : 'ℹ️ No key: only for devices without "encryption:" in the YAML. New ESPHome projects always have a key.'],
             ],
         ];
     }
@@ -749,19 +757,19 @@ class ESPHomeHubGeraet extends IPSModule
         if (($g['name'] ?? '') !== '') {
             $items[] = ['type' => 'Label', 'caption' => '📟 ' . ($g['anzeigename'] ?: $g['name']) . ' (' . $g['name'] . ')'
                 . ($g['hersteller'] !== '' ? ' · ' . $g['hersteller'] : '') . ' · ' . $g['modell']];
-            $items[] = ['type' => 'Label', 'caption' => 'ESPHome ' . $g['version'] . ' · erstellt ' . $g['kompiliert'] . ' · MAC ' . $g['mac']];
+            $items[] = ['type' => 'Label', 'caption' => ESPHomeHubText::t('ESPHome %s · built %s · MAC %s', $g['version'], $g['kompiliert'], $g['mac'])];
             if (($g['projekt'] ?? '') !== '') {
-                $items[] = ['type' => 'Label', 'caption' => 'Projekt: ' . $g['projekt'] . ' ' . $g['projektVersion']];
+                $items[] = ['type' => 'Label', 'caption' => ESPHomeHubText::t('Project: %s %s', $g['projekt'], $g['projektVersion'])];
             }
             if ((int)($g['bluetoothProxy'] ?? 0) !== 0) {
-                $items[] = ['type' => 'Label', 'caption' => '📡 Das Gerät ist ein Bluetooth-Proxy (dafür kommt ein eigenes Modul).'];
+                $items[] = ['type' => 'Label', 'caption' => '📡 The device is a Bluetooth proxy (a separate module for it is coming).'];
             }
             if ((int)($g['webserverPort'] ?? 0) !== 0) {
-                $items[] = ['type' => 'Label', 'caption' => '🌐 Eigene Weboberfläche auf Port ' . $g['webserverPort'] . '.'];
+                $items[] = ['type' => 'Label', 'caption' => ESPHomeHubText::t('🌐 Own web interface on port %s.', $g['webserverPort'])];
             }
         }
-        $items[] = ['type' => 'Button', 'caption' => '🔄 Neu verbinden', 'onClick' => 'ESPH_Neuverbinden($id);'];
-        return ['type' => 'ExpansionPanel', 'expanded' => $this->host() !== '', 'caption' => '📟  Gerät', 'items' => $items];
+        $items[] = ['type' => 'Button', 'caption' => '🔄 Reconnect', 'onClick' => 'ESPH_Neuverbinden($id);'];
+        return ['type' => 'ExpansionPanel', 'expanded' => $this->host() !== '', 'caption' => '📟  Device', 'items' => $items];
     }
 
     private function formEntitaeten(): array
@@ -771,59 +779,59 @@ class ESPHomeHubGeraet extends IPSModule
             $ident = ESPHomeHubEntitaeten::ident((int)$e['key']);
             $id = @$this->GetIDForIdent($ident);
             $zeilen[] = [
-                'typ'   => ESPHomeHubEntitaeten::TYP_NAMEN[$e['typ']] ?? $e['typ'],
-                'name'  => $e['name'] !== '' ? $e['name'] : '(Gerätename)',
+                'typ'   => ESPHomeHubText::t(ESPHomeHubEntitaeten::TYP_NAMEN[$e['typ']] ?? $e['typ']),
+                'name'  => $e['name'] !== '' ? $e['name'] : ESPHomeHubText::t('(device name)'),
                 'wert'  => $id ? GetValueFormatted($id) : '—',
                 'ident' => $ident,
             ];
         }
         $items = [];
         if (count($zeilen) === 0) {
-            $items[] = ['type' => 'Label', 'caption' => 'ℹ️ Noch keine Entitäten — sie kommen mit der ersten Verbindung.'];
+            $items[] = ['type' => 'Label', 'caption' => 'ℹ️ No entities yet — they arrive with the first connection.'];
         } else {
-            $items[] = ['type' => 'Label', 'caption' => '✅ ' . count($zeilen) . ' Entitäten. Die Variablen liegen unter dieser Instanz; schaltbare lassen sich direkt bedienen oder per RequestAction setzen.'];
+            $items[] = ['type' => 'Label', 'caption' => ESPHomeHubText::t('✅ %s entities. The variables are below this instance; switchable ones can be operated directly or set via RequestAction.', count($zeilen))];
             $items[] = ['type' => 'List', 'name' => 'EntitaetenListe', 'rowCount' => min(15, count($zeilen)), 'add' => false, 'delete' => false,
                 'columns' => [
-                    ['caption' => 'Art', 'name' => 'typ', 'width' => '130px'],
+                    ['caption' => 'Type', 'name' => 'typ', 'width' => '130px'],
                     ['caption' => 'Name', 'name' => 'name', 'width' => 'auto'],
-                    ['caption' => 'Wert', 'name' => 'wert', 'width' => '160px'],
+                    ['caption' => 'Value', 'name' => 'wert', 'width' => '160px'],
                     ['caption' => 'Ident', 'name' => 'ident', 'width' => '130px'],
                 ],
                 'values' => $zeilen];
         }
         $fehlt = json_decode($this->ReadAttributeString('NichtUnterstuetzt'), true) ?: [];
         if (count($fehlt) > 0) {
-            $items[] = ['type' => 'Label', 'caption' => '⚠️ Noch nicht unterstützt und deshalb übergangen: ' . implode(', ', $fehlt) . '.'];
+            $items[] = ['type' => 'Label', 'caption' => ESPHomeHubText::t('⚠️ Not supported yet and therefore skipped: %s.', implode(', ', $fehlt))];
         }
-        return ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '🧩  Entitäten', 'items' => $items];
+        return ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '🧩  Entities', 'items' => $items];
     }
 
     private function statuszeile(array $v): string
     {
-        $seit = isset($v['seit']) ? ' (seit ' . date('d.m.Y H:i:s', (int)$v['seit']) . ' Uhr)' : '';
+        $seit = isset($v['seit']) ? ' ' . ESPHomeHubText::t('(since %s)', date('d.m.Y H:i:s', (int)$v['seit'])) : '';
         switch ($v['zustand'] ?? 'aus') {
             case 'verbunden':
-                $ping = isset($v['ping']) ? ', letztes Lebenszeichen ' . date('H:i:s', (int)$v['ping']) . ' Uhr' : '';
-                return '✅ Verbunden' . (($v['verschluesselt'] ?? false) ? ' (verschlüsselt)' : ' (unverschlüsselt)') . $seit . $ping . '.';
+                $ping = isset($v['ping']) ? ESPHomeHubText::t(', last keep-alive %s', date('H:i:s', (int)$v['ping'])) : '';
+                return ESPHomeHubText::t('✅ Connected') . ' ' . (($v['verschluesselt'] ?? false) ? ESPHomeHubText::t('(encrypted)') : ESPHomeHubText::t('(unencrypted)')) . $seit . $ping . '.';
             case 'verbinde':
-                return 'ℹ️ Verbindung wird aufgebaut …' . $seit;
+                return ESPHomeHubText::t('ℹ️ Connecting …') . $seit;
             case 'getrennt':
-                return '⚠️ Getrennt' . $seit . (($v['text'] ?? '') !== '' ? ': ' . $v['text'] : '.') . ' Neuer Versuch alle ' . self::WACHE_S . ' s.';
+                return ESPHomeHubText::t('⚠️ Disconnected') . $seit . (($v['text'] ?? '') !== '' ? ': ' . $v['text'] : '.') . ' ' . ESPHomeHubText::t('Next attempt every %s s.', self::WACHE_S);
             case 'fehler':
-                return '⛔ ' . ($v['text'] ?? 'Fehler') . $seit;
+                return '⛔ ' . ($v['text'] ?? ESPHomeHubText::t('Error')) . $seit;
             default:
-                return 'ℹ️ Noch keine Adresse eingetragen.';
+                return ESPHomeHubText::t('ℹ️ No address entered yet.');
         }
     }
 
     private function formStatus(): array
     {
         return [
-            ['code' => 102, 'icon' => 'active', 'caption' => 'Verbunden'],
-            ['code' => 104, 'icon' => 'inactive', 'caption' => 'Bereit zur Einrichtung: Adresse eintragen'],
-            ['code' => self::STATUS_SCHLUESSEL_FALSCH, 'icon' => 'error', 'caption' => 'Der Schlüssel passt nicht zum Gerät'],
-            ['code' => self::STATUS_VERSCHLUESSELUNG, 'icon' => 'error', 'caption' => 'Verschlüsselung passt nicht (Gerät mit/ohne Schlüssel)'],
-            ['code' => self::STATUS_UNERREICHBAR, 'icon' => 'error', 'caption' => 'Gerät nicht erreichbar, neuer Versuch läuft'],
+            ['code' => 102, 'icon' => 'active', 'caption' => 'Connected'],
+            ['code' => 104, 'icon' => 'inactive', 'caption' => 'Ready for setup: enter an address'],
+            ['code' => self::STATUS_SCHLUESSEL_FALSCH, 'icon' => 'error', 'caption' => 'The key does not match the device'],
+            ['code' => self::STATUS_VERSCHLUESSELUNG, 'icon' => 'error', 'caption' => 'Encryption does not match (device with/without key)'],
+            ['code' => self::STATUS_UNERREICHBAR, 'icon' => 'error', 'caption' => 'Device not reachable, retrying'],
         ];
     }
 }

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/ESPHomeHubText.php';
+
 // ===========================================================================
 // ESPHome Native API: Rahmen und Protobuf, von Hand.
 //
@@ -110,7 +112,7 @@ final class ESPHomeHubProtokoll
         while ($p < $len) {
             $tag = self::varintLesen($s, $p);
             if ($tag === null) {
-                throw new RuntimeException('Protobuf: abgeschnittener Feldkopf');
+                throw new RuntimeException(ESPHomeHubText::t('Protobuf: truncated field header'));
             }
             $feld = $tag >> 3;
             $wt = $tag & 7;
@@ -132,10 +134,10 @@ final class ESPHomeHubProtokoll
                     $p += 4;
                     break;
                 default:
-                    throw new RuntimeException('Protobuf: unbekannter Wiretyp ' . $wt);
+                    throw new RuntimeException(ESPHomeHubText::t('Protobuf: unknown wire type %s', $wt));
             }
             if ($v === null) {
-                throw new RuntimeException('Protobuf: abgeschnittenes Feld ' . $feld);
+                throw new RuntimeException(ESPHomeHubText::t('Protobuf: truncated field %s', $feld));
             }
             $out[$feld][] = [$wt, $v];
         }
@@ -228,7 +230,7 @@ final class ESPHomeHubProtokoll
     public static function noiseInhaltLesen(string $klartext): array
     {
         if (strlen($klartext) < 4) {
-            throw new RuntimeException('Entschlüsselte Nachricht zu kurz (' . strlen($klartext) . ' Byte)');
+            throw new RuntimeException(ESPHomeHubText::t('Decrypted message too short (%s bytes)', strlen($klartext)));
         }
         return [(int)unpack('n', $klartext)[1], substr($klartext, 4)];
     }
@@ -276,7 +278,7 @@ final class ESPHomeHubProtokoll
             $puffer = (string)substr($puffer, $p + $len);
             return ['klartext', $typ, $daten];
         }
-        throw new RuntimeException(sprintf('Unbekanntes Präambel-Byte 0x%02X', $praeambel));
+        throw new RuntimeException(ESPHomeHubText::t('Unknown preamble byte 0x%s', sprintf('%02X', $praeambel)));
     }
 
     // ------------------------------------------------------------------ Nachrichten
@@ -320,7 +322,7 @@ final class ESPHomeHubProtokoll
     public static function serverHello(string $d): array
     {
         if ($d === '' || ord($d[0]) !== 0x01) {
-            throw new RuntimeException('Gerät bietet ein unbekanntes Verschlüsselungsverfahren an');
+            throw new RuntimeException(ESPHomeHubText::t('Device offers an unknown encryption method'));
         }
         $teile = explode("\0", substr($d, 1));
         return ['name' => (string)($teile[0] ?? ''), 'mac' => (string)($teile[1] ?? '')];

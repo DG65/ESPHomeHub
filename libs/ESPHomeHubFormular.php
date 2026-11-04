@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/ESPHomeHubText.php';
+
 // ===========================================================================
 // Gemeinsame Formular-Bausteine aller ESPHomeHub-Module nach der DG65-Formular-
 // Konvention: „Wozu dieses Modul?" → „Neu bis Version" → „Dokumentation &
@@ -18,24 +20,27 @@ trait ESPHomeHubFormular
     // „Was ist neu": Schlüssel = Version ohne Beta-/Build-Suffix.
     private static $ESPHOMEHUB_NEWS_VERSIONS = [
         '0.1.0' => [
-            '• Erstes Release: ESPHome-Geräte direkt über ihre eigene Schnittstelle (Native API) anbinden, ohne MQTT und ohne Home Assistant.',
-            '• Verschlüsselte Verbindung mit dem Schlüssel aus der Geräte-YAML, Lebenszeichen und automatisches Wiederverbinden.',
-            '• Geräteinfo (Name, Version, Modell, MAC) und eine Variable „Verbunden" je Gerät.',
+            '• First release: connect ESPHome devices directly through their own interface (Native API), without MQTT and without Home Assistant.',
+            '• Encrypted connection with the key from the device YAML, keep-alive and automatic reconnect.',
+            '• Device info (name, version, model, MAC) and a variable "Connected" per device.',
         ],
         '0.1.1' => [
-            '• Fehlt der Client Socket, legt das ESPHome-Gerät ihn selbst an und verbindet ihn.',
+            '• If the Client Socket is missing, the ESPHome device creates and connects it by itself.',
         ],
         '0.3.0' => [
-            '• 🔍 Neu: ESPHome-Konfigurator — findet die Geräte im Netz und legt sie mit einem Klick an, die Spalte „Schlüssel" zeigt, welches Gerät einen braucht.',
-            '• Geräte hinter VLAN- oder VPN-Grenzen lassen sich im Konfigurator von Hand eintragen.',
+            '• 🔍 New: ESPHome configurator — finds the devices on the network and creates them with one click; the column "Key" shows which device needs one.',
+            '• Devices behind VLAN or VPN boundaries can be entered manually in the configurator.',
         ],
         '0.4.0' => [
-            '• 🪟 Neu: Formular-Aufbau selbst wählen — im ESPHome-Gerät legst du im Panel „Formular: Aufbau" fest, welche Bereiche beim Öffnen aufgeklappt, zugeklappt oder ausgeblendet sind und in welcher Reihenfolge sie stehen.',
+            '• 🪟 New: choose the form layout yourself — in the ESPHome device, the panel "Form: layout" sets which sections are expanded, collapsed or hidden when the form opens and in which order they appear.',
+        ],
+        '0.5.0' => [
+            '• 🌐 New: English user interface — ESPHomeHub follows the language of Symcon.',
         ],
         '0.2.0' => [
-            '• 🧩 Sensoren, Schalter, Lichter, Rollläden, Lüfter, Schlösser, Klima und mehr werden automatisch zu Variablen — schaltbare direkt bedienbar.',
-            '• Die Variable übernimmt einen neuen Wert erst, wenn das Gerät ihn bestätigt.',
-            '• Panel „Entitäten" zeigt alles, was das Gerät meldet, mit aktuellem Wert.',
+            '• 🧩 Sensors, switches, lights, covers, fans, locks, climate and more become variables automatically — switchable ones can be operated directly.',
+            '• A variable only takes a new value once the device confirms it.',
+            '• Panel "Entities" shows everything the device reports, with its current value.',
         ],
     ];
 
@@ -111,8 +116,8 @@ trait ESPHomeHubFormular
         foreach ($this->esphomehubZweck() as $zeile) {
             $items[] = ['type' => 'Label', 'caption' => $zeile];
         }
-        $items[] = ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => $this->esphomehubPrefix() . '_AckPurposeIntro($id);'];
-        return ['type' => 'ExpansionPanel', 'name' => 'PurposeIntroPanel', 'expanded' => true, 'caption' => '👋  Wozu dieses Modul?', 'items' => $items];
+        $items[] = ['type' => 'Button', 'caption' => 'Got it – don\'t show again', 'onClick' => $this->esphomehubPrefix() . '_AckPurposeIntro($id);'];
+        return ['type' => 'ExpansionPanel', 'name' => 'PurposeIntroPanel', 'expanded' => true, 'caption' => '👋  What is this module for?', 'items' => $items];
     }
 
     protected function formNeu(): ?array
@@ -133,28 +138,28 @@ trait ESPHomeHubFormular
         uksort($offen, 'version_compare');
         $items = [];
         foreach ($offen as $version => $zeilen) {
-            $items[] = ['type' => 'Label', 'caption' => 'Version ' . $version . ':'];
+            $items[] = ['type' => 'Label', 'caption' => ESPHomeHubText::t('Version %s:', $version)];
             foreach ($zeilen as $zeile) {
                 $items[] = ['type' => 'Label', 'caption' => $zeile];
             }
         }
-        $items[] = ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => $this->esphomehubPrefix() . '_AckNews($id);'];
+        $items[] = ['type' => 'Button', 'caption' => 'Got it – don\'t show again', 'onClick' => $this->esphomehubPrefix() . '_AckNews($id);'];
         $keys = array_keys($offen);
-        return ['type' => 'ExpansionPanel', 'name' => 'NewsPanel', 'expanded' => true, 'caption' => '🆕  Neu bis Version ' . end($keys), 'items' => $items];
+        return ['type' => 'ExpansionPanel', 'name' => 'NewsPanel', 'expanded' => true, 'caption' => ESPHomeHubText::t('🆕  New up to version %s', end($keys)), 'items' => $items];
     }
 
     protected function formDoku(): array
     {
         $lib = $this->esphomehubBibliothek();
         $ver = isset($lib['Version'])
-            ? 'ℹ️ ESPHomeHub Version ' . $lib['Version'] . ' (Build ' . ($lib['Build'] ?? '?') . ')'
+            ? ESPHomeHubText::t('ℹ️ ESPHomeHub version %s (build %s)', $lib['Version'], $lib['Build'] ?? '?')
             : 'ℹ️ ESPHomeHub';
         $items = [['type' => 'Label', 'caption' => $ver]];
         foreach ($this->esphomehubDoku() as $zeile) {
             $items[] = ['type' => 'Label', 'caption' => $zeile];
         }
-        $items[] = ['type' => 'Button', 'caption' => 'Anleitung auf GitHub', 'onClick' => "echo '" . self::$ESPHOMEHUB_REPO_URL . "';", 'link' => true];
-        return ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '📖  Dokumentation & Hilfe', 'items' => $items];
+        $items[] = ['type' => 'Button', 'caption' => 'Manual on GitHub', 'onClick' => "echo '" . self::$ESPHOMEHUB_REPO_URL . "';", 'link' => true];
+        return ['type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '📖  Documentation & help', 'items' => $items];
     }
 
     protected function formRueckmeldung(): ?array
@@ -165,12 +170,12 @@ trait ESPHomeHubFormular
         // Forum-Thread seit 0.3.5; GitHub bleibt als zweiter Weg für Fehlerberichte.
         return [
             'type' => 'ExpansionPanel', 'name' => 'ForumHintPanel', 'expanded' => true,
-            'caption' => '💬  Rückmeldungen',
+            'caption' => '💬  Feedback',
             'items' => [
-                ['type' => 'Label', 'caption' => '🧪 ESPHomeHub ist neu. Läuft dein Gerät? Fehlt etwas? Schreib es gern in den ESPHomeHub-Thread im Symcon-Forum — mit ESPHome-Version und Chip (ESP32, ESP8266 …) aus dem Panel „Gerät".'],
-                ['type' => 'Button', 'caption' => 'Zum Forum-Thread', 'onClick' => "echo '" . self::$ESPHOMEHUB_FORUM_URL . "';", 'link' => true],
-                ['type' => 'Button', 'caption' => 'Fehler auf GitHub melden', 'onClick' => "echo '" . self::$ESPHOMEHUB_ISSUES_URL . "';", 'link' => true],
-                ['type' => 'Button', 'caption' => 'Verstanden – nicht mehr anzeigen', 'onClick' => $this->esphomehubPrefix() . '_AckForumHint($id);'],
+                ['type' => 'Label', 'caption' => '🧪 ESPHomeHub is new. Does your device work? Is something missing? Feel free to post in the ESPHomeHub thread in the Symcon forum — with ESPHome version and chip (ESP32, ESP8266 …) from the panel "Device".'],
+                ['type' => 'Button', 'caption' => 'Go to the forum thread', 'onClick' => "echo '" . self::$ESPHOMEHUB_FORUM_URL . "';", 'link' => true],
+                ['type' => 'Button', 'caption' => 'Report a bug on GitHub', 'onClick' => "echo '" . self::$ESPHOMEHUB_ISSUES_URL . "';", 'link' => true],
+                ['type' => 'Button', 'caption' => 'Got it – don\'t show again', 'onClick' => $this->esphomehubPrefix() . '_AckForumHint($id);'],
             ],
         ];
     }
@@ -180,14 +185,14 @@ trait ESPHomeHubFormular
     {
         return [
             'type' => 'ExpansionPanel', 'expanded' => false,
-            'caption' => '🧡  Über dieses Modul',
+            'caption' => '🧡  About this module',
             'items' => [
-                ['type' => 'Label', 'caption' => 'Entstanden aus echter Begeisterung für die eigene Anlage — und ein paar durchgetippten Abenden. Trotzdem: Software-Hobby hin oder her, das hier ist geistiges Eigentum und echte Arbeit steckt drin.'],
-                ['type' => 'Label', 'caption' => 'Lizenz: PolyForm Noncommercial 1.0.0 — privat und nicht-kommerziell frei nutzbar, für den gewerblichen Einsatz braucht es eine gesonderte Lizenz vom Rechteinhaber.'],
-                ['type' => 'Button', 'caption' => 'Lizenztext ansehen', 'onClick' => "echo '" . self::$ESPHOMEHUB_LICENSE_URL . "';", 'link' => true],
-                ['type' => 'Label', 'caption' => 'Gewerbliche Nutzung oder Fragen zur Lizenz? Einfach melden: dietmar@gureth.eu'],
-                ['type' => 'Label', 'caption' => 'Gefällt dir das Modul und du möchtest trotzdem etwas dalassen? Über eine kleine Spende freue ich mich — völlig freiwillig, keine Gegenleistung nötig.'],
-                ['type' => 'Button', 'caption' => '☕  Spenden via PayPal', 'onClick' => "echo '" . self::$ESPHOMEHUB_PAYPAL_URL . "';", 'link' => true],
+                ['type' => 'Label', 'caption' => 'Born out of real enthusiasm for my own setup — and quite a few evenings of typing. Still: hobby software or not, this is intellectual property and real work went into it.'],
+                ['type' => 'Label', 'caption' => 'License: PolyForm Noncommercial 1.0.0 — free for private and non-commercial use; commercial use requires a separate license from the rights holder.'],
+                ['type' => 'Button', 'caption' => 'View license text', 'onClick' => "echo '" . self::$ESPHOMEHUB_LICENSE_URL . "';", 'link' => true],
+                ['type' => 'Label', 'caption' => 'Commercial use or questions about the license? Just get in touch: dietmar@gureth.eu'],
+                ['type' => 'Label', 'caption' => 'You like the module and would like to leave something anyway? I am happy about a small donation — completely voluntary, nothing required in return.'],
+                ['type' => 'Button', 'caption' => '☕  Donate via PayPal', 'onClick' => "echo '" . self::$ESPHOMEHUB_PAYPAL_URL . "';", 'link' => true],
             ],
         ];
     }
@@ -224,7 +229,21 @@ trait ESPHomeHubFormular
             $aufbau,
             [$this->formRueckmeldung(), $this->formLizenz()]
         )));
-        return (string)json_encode(['elements' => $elements, 'actions' => $aktionen, 'status' => $status]);
+        return (string)json_encode(['elements' => $this->formUebersetzen($elements), 'actions' => $this->formUebersetzen($aktionen),
+            'status' => $this->formUebersetzen($status)]);
+    }
+
+    /** Übersetzt alle Überschriften im Formular (Quelltexte englisch, Deutsch in locale.json). */
+    private function formUebersetzen(array $teil): array
+    {
+        foreach ($teil as $k => $v) {
+            if (is_array($v)) {
+                $teil[$k] = $this->formUebersetzen($v);
+            } elseif ($k === 'caption' && is_string($v)) {
+                $teil[$k] = ESPHomeHubText::t($v);
+            }
+        }
+        return $teil;
     }
 
     /**
@@ -266,7 +285,7 @@ trait ESPHomeHubFormular
 
     private function formPanelName(array $panel): string
     {
-        return trim((string)preg_replace('/\s*\(.*$/u', '', (string)($panel['caption'] ?? '')));
+        return trim((string)preg_replace('/\s*\(.*$/u', '', ESPHomeHubText::t((string)($panel['caption'] ?? ''))));
     }
 
     /** Panel „Formular: Aufbau": je Fachpanel Aufklapp-Zustand beim Öffnen und Position. */
@@ -283,28 +302,28 @@ trait ESPHomeHubFormular
             }
         }
         $versteckZeile = $versteckt
-            ? [['type' => 'Label', 'caption' => '🙈 Ausgeblendet: ' . implode(', ', $versteckt) . ' — zum Wiederzeigen den Haken bei „Ausgeblendet" entfernen. Ausgeblendete Bereiche arbeiten weiter, nur die Anzeige fehlt.']]
+            ? [['type' => 'Label', 'caption' => ESPHomeHubText::t('🙈 Hidden: %s — to show again, clear the "Hidden" checkbox. Hidden sections keep working, only the display is missing.', implode(', ', $versteckt))]]
             : [];
         return [
             'type' => 'ExpansionPanel', 'expanded' => false,
-            'caption' => '🪟  Formular: Aufbau' . ($versteckt ? ' (' . count($versteckt) . ' ausgeblendet)' : ''),
+            'caption' => ESPHomeHubText::t('🪟  Form: layout') . ($versteckt ? ' ' . ESPHomeHubText::t('(%s hidden)', count($versteckt)) : ''),
             'items' => array_merge($versteckZeile, [
-                ['type' => 'Label', 'caption' => 'Hier legst du fest, welche Bereiche beim Öffnen des Formulars aufgeklappt sind und in welcher Reihenfolge sie stehen. Symcon merkt sich das Auf- und Zuklappen nicht selbst, deshalb gilt die Einstellung hier jedes Mal beim Öffnen. Sie wirkt nach „Übernehmen" beim nächsten Öffnen des Formulars.'],
-                ['type' => 'Label', 'caption' => 'Kein Haken heißt „Standard": wie das Modul es vorsieht (z. B. „Verbindung" aufgeklappt, solange keine Adresse eingetragen ist, danach „Gerät"). Die Position ist eine Zahl; bei gleicher Zahl bleibt die Standardreihenfolge. „Ausgeblendet" nimmt einen Bereich aus der Anzeige, ohne dass er etwas verliert: seine Einstellungen bleiben erhalten und wirken weiter. Zum Wiederzeigen den Haken entfernen oder „Auf Standard zurücksetzen" klicken. Sind mehrere Haken gesetzt, gilt „Ausgeblendet" vor „Zugeklappt" vor „Aufgeklappt". Die Bereiche oben (Zweck, Neu, Dokumentation) und unten (Rückmeldungen, Über dieses Modul) bleiben, wo sie sind, und lassen sich nicht ausblenden.'],
+                ['type' => 'Label', 'caption' => 'Here you decide which sections are expanded when the form opens and in which order they appear. Symcon does not remember expanding and collapsing, so this setting applies every time the form opens. It takes effect after "Apply" the next time the form is opened.'],
+                ['type' => 'Label', 'caption' => 'No checkbox means "default": as the module intends (e.g. "Connection" expanded as long as no address is entered, then "Device"). The position is a number; with equal numbers the default order applies. "Hidden" removes a section from the display without it losing anything: its settings are kept and keep working. To show it again, clear the checkbox or click "Reset to default". If several checkboxes are set, "Hidden" wins over "Collapsed", which wins over "Expanded". The sections at the top (purpose, news, documentation) and at the bottom (feedback, about this module) stay where they are and cannot be hidden.'],
                 [
-                    'type' => 'List', 'name' => 'FormLayout', 'caption' => 'Bereiche', 'rowCount' => count($zeilen), 'add' => false, 'delete' => false,
+                    'type' => 'List', 'name' => 'FormLayout', 'caption' => 'Sections', 'rowCount' => count($zeilen), 'add' => false, 'delete' => false,
                     'loadValuesFromConfiguration' => false,
                     'values' => $zeilen,
                     'columns' => [
-                        ['caption' => 'Bereich', 'name' => 'Panel', 'width' => 'auto', 'add' => ''],
-                        ['caption' => 'Schlüssel', 'name' => 'Key', 'width' => '0px', 'visible' => false, 'add' => '', 'save' => true],
-                        ['caption' => 'Aufgeklappt', 'name' => 'Opened', 'width' => '110px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
-                        ['caption' => 'Zugeklappt', 'name' => 'Closed', 'width' => '110px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
-                        ['caption' => '🙈 Ausgeblendet', 'name' => 'Hidden', 'width' => '130px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
+                        ['caption' => 'Section', 'name' => 'Panel', 'width' => 'auto', 'add' => ''],
+                        ['caption' => 'Key', 'name' => 'Key', 'width' => '0px', 'visible' => false, 'add' => '', 'save' => true],
+                        ['caption' => 'Expanded', 'name' => 'Opened', 'width' => '110px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
+                        ['caption' => 'Collapsed', 'name' => 'Closed', 'width' => '110px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
+                        ['caption' => '🙈 Hidden', 'name' => 'Hidden', 'width' => '130px', 'add' => false, 'edit' => ['type' => 'CheckBox']],
                         ['caption' => 'Position', 'name' => 'Pos', 'width' => '100px', 'add' => 1, 'edit' => ['type' => 'NumberSpinner', 'minimum' => 1, 'maximum' => 99]],
                     ],
                 ],
-                ['type' => 'Button', 'caption' => '↩️ Auf Standard zurücksetzen', 'onClick' => 'echo ' . $this->esphomehubPrefix() . '_ResetFormLayout($id);'],
+                ['type' => 'Button', 'caption' => '↩️ Reset to default', 'onClick' => 'echo ' . $this->esphomehubPrefix() . '_ResetFormLayout($id);'],
             ]),
         ];
     }

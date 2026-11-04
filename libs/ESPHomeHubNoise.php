@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/ESPHomeHubText.php';
+
 // ===========================================================================
 // Noise_NNpsk0_25519_ChaChaPoly_SHA256 — die Verschlüsselung der ESPHome-API.
 //
@@ -57,7 +59,7 @@ final class ESPHomeHubCipher
         }
         $p = sodium_crypto_aead_chacha20poly1305_ietf_decrypt($geheim, $ad, $this->nonce(), $this->k);
         if ($p === false) {
-            throw new ESPHomeHubSchluesselFehler('Entschlüsseln fehlgeschlagen');
+            throw new ESPHomeHubSchluesselFehler('Decryption failed');
         }
         $this->n++;
         return $p;
@@ -156,7 +158,7 @@ final class ESPHomeHubNoise
     public function nachricht2(string $nachricht): array
     {
         if (strlen($nachricht) < 48) {
-            throw new RuntimeException('Handshake-Antwort zu kurz (' . strlen($nachricht) . ' Byte)');
+            throw new RuntimeException(ESPHomeHubText::t('Handshake response too short (%s bytes)', strlen($nachricht)));
         }
         $re = substr($nachricht, 0, 32);
         $this->mischeHash($re);

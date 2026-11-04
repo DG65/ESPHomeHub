@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/ESPHomeHubText.php';
 require_once __DIR__ . '/ESPHomeHubNoise.php';
 require_once __DIR__ . '/ESPHomeHubProtokoll.php';
 require_once __DIR__ . '/ESPHomeHubZeitzone.php';
@@ -93,7 +94,7 @@ final class ESPHomeHubSitzung
     public function senden(int $typ, string $daten = ''): string
     {
         if ($this->phase === self::AUS || $this->phase === self::SERVER_HELLO || $this->phase === self::HANDSHAKE) {
-            throw new RuntimeException('Sitzung noch nicht aufgebaut');
+            throw new RuntimeException(ESPHomeHubText::t('Session not established yet'));
         }
         if (!$this->verschluesselt) {
             return ESPHomeHubProtokoll::klartextRahmen($typ, $daten);
@@ -118,11 +119,11 @@ final class ESPHomeHubSitzung
                 break;
             }
             if ($rahmen[0] === 'klartext' && $this->verschluesselt) {
-                $ereignisse[] = $this->abbrechen('unverschluesselt', 'Das Gerät spricht unverschlüsselt, hier ist aber ein Schlüssel eingetragen.');
+                $ereignisse[] = $this->abbrechen('unverschluesselt', ESPHomeHubText::t('The device talks unencrypted, but a key is entered here.'));
                 break;
             }
             if ($rahmen[0] === 'noise' && !$this->verschluesselt) {
-                $ereignisse[] = $this->abbrechen('verschluesselt', 'Das Gerät verlangt einen Schlüssel (api: encryption: key in der Geräte-YAML).');
+                $ereignisse[] = $this->abbrechen('verschluesselt', ESPHomeHubText::t('The device requires a key (api: encryption: key in the device YAML).'));
                 break;
             }
             try {
@@ -132,7 +133,7 @@ final class ESPHomeHubSitzung
                     $this->noiseRahmen($rahmen[1], $raus, $ereignisse);
                 }
             } catch (ESPHomeHubSchluesselFehler $e) {
-                $ereignisse[] = $this->abbrechen('schluessel', 'Der Schlüssel passt nicht zum Gerät.');
+                $ereignisse[] = $this->abbrechen('schluessel', ESPHomeHubText::t('The key does not match the device.'));
             } catch (RuntimeException $e) {
                 $ereignisse[] = $this->abbrechen('protokoll', $e->getMessage());
             }
@@ -149,14 +150,14 @@ final class ESPHomeHubSitzung
                 return;
             case self::HANDSHAKE:
                 if ($daten === '') {
-                    throw new RuntimeException('Leere Handshake-Antwort');
+                    throw new RuntimeException(ESPHomeHubText::t('Empty handshake response'));
                 }
                 if ($daten[0] !== "\x00") {
                     $grund = substr($daten, 1);
                     if ($grund === 'Handshake MAC failure') {
                         throw new ESPHomeHubSchluesselFehler($grund);
                     }
-                    throw new RuntimeException('Gerät lehnt den Handshake ab: ' . $grund);
+                    throw new RuntimeException(ESPHomeHubText::t('Device rejects the handshake: %s', $grund));
                 }
                 [$this->tx, $this->rx] = $this->noise->nachricht2(substr($daten, 1));
                 $this->noise = null;

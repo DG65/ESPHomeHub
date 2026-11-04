@@ -106,6 +106,7 @@ class IPSModule
     protected function SendDebug($t, $m, $f) { $GLOBALS['DEBUG'][] = "$t: $m"; }
     protected function LogMessage($m, $t) { $GLOBALS['LOG'][] = [$t, $m]; }
     protected function UpdateFormField($f, $p, $v) { $GLOBALS['FORMFELD'][$f][$p] = $v; }
+    protected function Translate($t) { return deutsch((string)$t); }
     protected function HasActiveParent() { return $GLOBALS['SOCKET']['status'] === IS_ACTIVE; }
     protected function SendDataToParent($json)
     {
@@ -226,6 +227,21 @@ function empfangen(string $bytes): void
     geraet()->ReceiveData(json_encode(['DataID' => '{018EF6B5-AB94-40C6-AA53-46943E824ACF}', 'Buffer' => mb_convert_encoding($bytes, 'UTF-8', 'ISO-8859-1')]));
 }
 
+// Deutsche Oberfläche wie in Dietmars Symcon: Übersetzung aus libs/locale.json, Lücken werden gesammelt.
+$GLOBALS['LOCALE_DE'] = json_decode((string)file_get_contents($ROOT . '/libs/locale.json'), true)['translations']['de'];
+$GLOBALS['FEHLT_DE'] = [];
+function deutsch(string $t): string
+{
+    if (getenv('ESPHOMEHUB_SPRACHE') === 'en') {
+        return $t;   // englischer Prüflauf: deutsche Prüftexte schlagen erwartungsgemäß fehl
+    }
+    if (!isset($GLOBALS['LOCALE_DE'][$t])) {
+        $GLOBALS['FEHLT_DE'][$t] = true;
+    }
+    return $GLOBALS['LOCALE_DE'][$t] ?? $t;
+}
+require_once $ROOT . '/libs/ESPHomeHubText.php';
+ESPHomeHubText::setzen('deutsch');
 require_once $ROOT . '/ESPHomeHubGeraet/module.php';
 require_once $ROOT . '/ESPHomeHubKonfigurator/module.php';
 $P = 'ESPHomeHubProtokoll';
@@ -772,6 +788,9 @@ pruefe(!str_contains((string)$kk->GetConfigurationForm(), '"FormLayout"') && !st
 
 // ------------------------------------------------------------------ 5. Store-Regeln
 abschnitt('Store-Regeln');
+if (getenv('ESPHOMEHUB_FORMULAR')) {
+    file_put_contents(getenv('ESPHOMEHUB_FORMULAR'), geraet()->GetConfigurationForm());
+}
 $GLOBALS['Z'][10000]['p']['Host'] = 'sim.local';
 $form = json_decode((string)geraet()->GetConfigurationForm(), true);
 pruefe(is_array($form) && isset($form['elements'], $form['status']), 'Formular ist gültiges JSON');
@@ -925,6 +944,48 @@ if ($live) {
         $t->schliessen();
     }
 }
+
+// ------------------------------------------------------------------ 7. Übersetzung
+abschnitt('Übersetzung (Quelltexte englisch, Deutsch in locale.json)');
+// Gleich in beiden Sprachen, deshalb ohne Eintrag
+$neutral = ['Port', 'Name', 'MAC', 'ESPHome', 'Chip', 'Ident', 'Position', 'Sensor', 'Text', 'Gas', 'OK', 'Problem', 'Normal', 'Vibration', 'Version %s:'];
+$luecken = [];
+foreach (array_merge(glob($ROOT . '/libs/*.php'), glob($ROOT . '/*/module.php')) as $datei) {
+    $code = (string)file_get_contents($datei);
+    preg_match_all("/ESPHomeHubText::t\\('((?:[^'\\\\\\\\]|\\\\\\\\.)*)'/u", $code, $t1);
+    preg_match_all("/'(?:caption|Caption)' => '((?:[^'\\\\\\\\]|\\\\\\\\.)*)'/u", $code, $t2);
+    preg_match_all("/=> \\['((?:[^'\\\\\\\\]|\\\\\\\\.)*)', '((?:[^'\\\\\\\\]|\\\\\\\\.)*)'\\]/u", $code, $t3);
+    foreach (array_merge($t1[1], $t2[1], $t3[1], $t3[2]) as $roh) {
+        $text = stripslashes($roh);
+        if (preg_match('/[A-Za-z]{2,}/', $text) && !in_array($text, $neutral, true) && !isset($GLOBALS['LOCALE_DE'][$text])) {
+            $luecken[] = basename(dirname($datei)) . '/' . basename($datei) . ': ' . $text;
+        }
+    }
+}
+pruefe($luecken === [], 'jeder Text im Code steht in locale.json' . ($luecken ? ': ' . implode(' | ', array_slice($luecken, 0, 8)) : ''));
+$tab = (string)file_get_contents($ROOT . '/libs/locale.json');
+pruefe($tab === file_get_contents($ROOT . '/ESPHomeHubGeraet/locale.json') && $tab === file_get_contents($ROOT . '/ESPHomeHubKonfigurator/locale.json'), 'locale.json in beiden Modulordnern gleich (php .tools/locale-bauen.php)');
+$platzhalter = [];
+foreach ($GLOBALS['LOCALE_DE'] as $en => $de) {
+    if (substr_count($en, '%s') !== substr_count($de, '%s') || preg_match('/%(?!s)/', str_replace('%%', '', $en))) {
+        $platzhalter[] = $en;
+    }
+}
+pruefe($platzhalter === [], 'Platzhalter %s in Englisch und Deutsch gleich' . ($platzhalter ? ': ' . implode(' | ', $platzhalter) : ''));
+$ohneUmlaut = true;
+foreach (array_merge(glob($ROOT . '/libs/*.php'), glob($ROOT . '/*/module.php')) as $datei) {
+    foreach (file($datei) as $nr => $zeile) {
+        $z = trim($zeile);
+        if (str_starts_with($z, '//') || str_starts_with($z, '*') || str_starts_with($z, '/*') || str_contains($zeile, 'SendDebug') || str_contains($zeile, 'community.symcon.de')) {
+            continue;
+        }
+        if (preg_match("/'[^']*[äöüÄÖÜß][^']*'/u", $zeile)) {
+            $ohneUmlaut = false;
+            echo '    deutsch: ' . basename($datei) . ':' . ($nr + 1) . "\n";
+        }
+    }
+}
+pruefe($ohneUmlaut, 'keine deutschen Texte mehr im Code (außer Kommentaren und Debug)');
 
 echo "\n" . ($FEHLER === 0 ? "✅ alle $OK Prüfungen bestanden" : "❌ $FEHLER von " . ($OK + $FEHLER) . ' Prüfungen fehlgeschlagen') . "\n";
 exit($FEHLER === 0 ? 0 : 1);

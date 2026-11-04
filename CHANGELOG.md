@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 (04.11.2026)
+
+- Englische Oberfläche: Formulare, Meldungen, Variablennamen und Klartexte folgen der Sprache von Symcon. Quelltexte sind englisch, Deutsch steht in `locale.json`. Idents, Funktionsnamen und JSON-Schlüssel bleiben unverändert.
+- README auf Englisch (`README.en.md`).
+- Schon angelegte Variablen behalten ihren Namen; neue bekommen ihn in der Sprache von Symcon.
+
 ## 0.4.0 (29.10.2026)
 
 - ESPHome-Gerät: neues Panel „🪟 Formular: Aufbau" (DG65-Formular-Konvention, SUITE.md 3a). Je Bereich (Verbindung, Gerät, Entitäten) aufgeklappt, zugeklappt oder ausgeblendet und eine Position; Knopf „Auf Standard zurücksetzen". Ausgeblendete Bereiche bleiben im Formular und verlieren nichts.

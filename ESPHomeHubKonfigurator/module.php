@@ -23,6 +23,14 @@ class ESPHomeHubKonfigurator extends IPSModule
 {
     use ESPHomeHubFormular;
 
+    public function __construct($InstanceID)
+    {
+        parent::__construct($InstanceID);
+        // Quelltexte sind englisch; die Bibliotheken übersetzen über die locale.json dieses Moduls.
+        ESPHomeHubText::setzen(fn (string $text): string => $this->Translate($text));
+    }
+
+
     private const DNSSD = '{780B2D48-916C-4D59-AD35-5A429B2355A5}';
     private const GERAET = '{796D9D82-B2F7-4F80-BAA7-8CC50237B2EF}';
     private const CLIENT_SOCKET = '{3CFF0FD9-E306-41DB-9B5A-9D06D38576C3}';
@@ -53,8 +61,8 @@ class ESPHomeHubKonfigurator extends IPSModule
         $this->UpdateFormField('Geraete', 'values', (string)json_encode($this->zeilen($gefunden)));
         $netz = $this->ReadAttributeInteger('LastDiscoveryCount');
         $hand = count($gefunden) - $netz;
-        echo '🔍 ' . $netz . ' ESPHome-' . ($netz === 1 ? 'Gerät' : 'Geräte') . ' im Netz gefunden'
-            . ($hand > 0 ? ', dazu ' . $hand . ' von Hand eingetragen' : '') . '.';
+        echo ESPHomeHubText::t($netz === 1 ? '🔍 %s ESPHome device found on the network' : '🔍 %s ESPHome devices found on the network', $netz)
+            . ($hand > 0 ? ESPHomeHubText::t(', plus %s entered manually', $hand) : '') . '.';
     }
 
     /** Gefundene Geräte als JSON (Name, Adresse, Port, MAC, Version, Chip, Schlüssel nötig). */
@@ -175,8 +183,8 @@ class ESPHomeHubKonfigurator extends IPSModule
                 'mac'        => self::macAnzeige($g['mac']),
                 'version'    => $g['version'],
                 'chip'       => $g['chip'],
-                'schluessel' => $g['schluessel'] === null ? '?' : ($g['schluessel'] ? '🔑 nötig' : 'ohne'),
-                'quelle'     => $g['quelle'] === 'mdns' ? 'im Netz gefunden' : 'von Hand eingetragen',
+                'schluessel' => $g['schluessel'] === null ? '?' : ($g['schluessel'] ? ESPHomeHubText::t('🔑 required') : ESPHomeHubText::t('none')),
+                'quelle'     => $g['quelle'] === 'mdns' ? ESPHomeHubText::t('found on the network') : ESPHomeHubText::t('entered manually'),
                 'instanceID' => $treffer,
                 'create'     => [
                     [
@@ -187,7 +195,7 @@ class ESPHomeHubKonfigurator extends IPSModule
                     [
                         'moduleID'      => self::CLIENT_SOCKET,
                         'configuration' => ['Host' => $g['adresse'], 'Port' => $g['port'], 'Open' => false],
-                        'name'          => 'ESPHome-Verbindung (' . $anzeige . ')',
+                        'name'          => ESPHomeHubText::t('ESPHome connection (%s)', $anzeige),
                     ],
                 ],
             ];
@@ -202,7 +210,7 @@ class ESPHomeHubKonfigurator extends IPSModule
                 'version'    => (string)($i['info']['version'] ?? ''),
                 'chip'       => (string)($i['info']['modell'] ?? ''),
                 'schluessel' => '',
-                'quelle'     => 'nicht gefunden',
+                'quelle'     => ESPHomeHubText::t('not found'),
                 'instanceID' => $id,
             ];
         }
@@ -218,13 +226,13 @@ class ESPHomeHubKonfigurator extends IPSModule
     {
         $ts = $this->ReadAttributeInteger('LastDiscoveryTs');
         if ($ts === 0) {
-            return 'ℹ️ Noch nicht gesucht.';
+            return ESPHomeHubText::t('ℹ️ Not searched yet.');
         }
         $n = $this->ReadAttributeInteger('LastDiscoveryCount');
         if (count(IPS_GetInstanceListByModuleID(self::DNSSD)) === 0) {
-            return '⚠️ Keine DNS-SD-Instanz gefunden — die Suche im Netz braucht sie (Kerninstanzen). Adressen von Hand gehen trotzdem.';
+            return ESPHomeHubText::t('⚠️ No DNS-SD instance found — the network search needs it (core instances). Manual addresses still work.');
         }
-        return ($n > 0 ? '✅ ' : 'ℹ️ ') . $n . ' ESPHome-' . ($n === 1 ? 'Gerät' : 'Geräte') . ' im Netz gefunden (zuletzt ' . date('H:i:s', $ts) . ' Uhr).';
+        return ($n > 0 ? '✅ ' : 'ℹ️ ') . ESPHomeHubText::t($n === 1 ? '%s ESPHome device found on the network (last search %s).' : '%s ESPHome devices found on the network (last search %s).', $n, date('H:i:s', $ts));
     }
 
     protected function esphomehubPrefix(): string
@@ -235,17 +243,17 @@ class ESPHomeHubKonfigurator extends IPSModule
     protected function esphomehubZweck(): array
     {
         return [
-            'Findet ESPHome-Geräte im Heimnetz (mDNS) und legt sie mit einem Klick als ESPHome-Gerät samt Verbindung an.',
-            'Danach in der neuen Instanz den Schlüssel aus „api: encryption: key" der Geräte-YAML eintragen — die Spalte „Schlüssel" zeigt, welches Gerät einen braucht.',
+            'Finds ESPHome devices on the home network (mDNS) and creates them with one click as ESPHome device including the connection.',
+            'Then enter the key from "api: encryption: key" of the device YAML in the new instance — the column "Key" shows which device needs one.',
         ];
     }
 
     protected function esphomehubDoku(): array
     {
         return [
-            'Gesucht wird über Symcons DNS-SD-Instanz nach dem Dienst _esphomelib._tcp. Das reicht nur im selben Netzsegment: hinter VLAN-Grenzen, Docker ohne Host-Netz oder VPN findet die Suche nichts.',
-            'Für solche Geräte unten „Adressen von Hand" eintragen (IP-Adresse oder Hostname, Port 6053, sofern in der YAML nicht anders).',
-            'Vorhandene Instanzen erkennt der Konfigurator an der MAC-Adresse, eine geänderte IP-Adresse führt also nicht zu einem zweiten Eintrag. Die neue Adresse trägt man in der Instanz ein.',
+            'The search uses the DNS-SD instance of Symcon to look for the service _esphomelib._tcp. That only reaches the same network segment: behind VLAN boundaries, Docker without host network or VPN the search finds nothing.',
+            'For such devices, use "Manual addresses" below (IP address or host name, port 6053 unless set otherwise in the YAML).',
+            'The configurator recognises existing instances by their MAC address, so a changed IP address does not lead to a second entry. Enter the new address in the instance.',
         ];
     }
 
@@ -253,40 +261,40 @@ class ESPHomeHubKonfigurator extends IPSModule
     {
         $gefunden = $this->geraeteSuchen();
         $suche = [
-            'type' => 'ExpansionPanel', 'expanded' => true, 'caption' => '🔍  Geräte im Netz',
+            'type' => 'ExpansionPanel', 'expanded' => true, 'caption' => '🔍  Devices on the network',
             'items' => [
-                ['type' => 'Button', 'caption' => '🔍 Neu suchen', 'onClick' => 'ESPHC_Suchen($id);'],
+                ['type' => 'Button', 'caption' => '🔍 Search again', 'onClick' => 'ESPHC_Suchen($id);'],
                 ['type' => 'Label', 'name' => 'Kopfzeile', 'caption' => $this->kopfzeile()],
                 [
-                    'type' => 'Configurator', 'name' => 'Geraete', 'caption' => 'ESPHome-Geräte', 'rowCount' => 12,
+                    'type' => 'Configurator', 'name' => 'Geraete', 'caption' => 'ESPHome devices', 'rowCount' => 12,
                     'add' => false, 'delete' => true, 'sort' => ['column' => 'name', 'direction' => 'ascending'],
                     'columns' => [
                         ['caption' => 'Name', 'name' => 'name', 'width' => 'auto'],
-                        ['caption' => 'Gerät', 'name' => 'geraet', 'width' => '160px'],
-                        ['caption' => 'Adresse', 'name' => 'adresse', 'width' => '150px'],
+                        ['caption' => 'Device', 'name' => 'geraet', 'width' => '160px'],
+                        ['caption' => 'Address', 'name' => 'adresse', 'width' => '150px'],
                         ['caption' => 'MAC', 'name' => 'mac', 'width' => '150px'],
                         ['caption' => 'ESPHome', 'name' => 'version', 'width' => '100px'],
                         ['caption' => 'Chip', 'name' => 'chip', 'width' => '150px'],
-                        ['caption' => 'Schlüssel', 'name' => 'schluessel', 'width' => '90px'],
-                        ['caption' => 'Quelle', 'name' => 'quelle', 'width' => '150px'],
+                        ['caption' => 'Key', 'name' => 'schluessel', 'width' => '90px'],
+                        ['caption' => 'Source', 'name' => 'quelle', 'width' => '150px'],
                     ],
                     'values' => $this->zeilen($gefunden),
                 ],
             ],
         ];
         $hand = [
-            'type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '✏️  Adressen von Hand',
+            'type' => 'ExpansionPanel', 'expanded' => false, 'caption' => '✏️  Manual addresses',
             'items' => [
-                ['type' => 'Label', 'caption' => 'Für Geräte, die die Suche nicht erreicht (anderes Netzsegment, VLAN, VPN). Nach „Übernehmen" erscheinen sie oben in der Liste.'],
+                ['type' => 'Label', 'caption' => 'For devices the search cannot reach (other network segment, VLAN, VPN). After "Apply" they appear in the list above.'],
                 [
                     'type' => 'List', 'name' => 'Adressen', 'rowCount' => 5, 'add' => true, 'delete' => true,
                     'columns' => [
-                        ['caption' => 'IP-Adresse oder Hostname', 'name' => 'Adresse', 'width' => 'auto', 'add' => '', 'edit' => ['type' => 'ValidationTextBox']],
+                        ['caption' => 'IP address or host name', 'name' => 'Adresse', 'width' => 'auto', 'add' => '', 'edit' => ['type' => 'ValidationTextBox']],
                         ['caption' => 'Port', 'name' => 'Port', 'width' => '100px', 'add' => 6053, 'edit' => ['type' => 'NumberSpinner', 'minimum' => 1, 'maximum' => 65535]],
                     ],
                 ],
             ],
         ];
-        return $this->esphomehubFormular([$suche, $hand], [], [['code' => 102, 'icon' => 'active', 'caption' => 'Bereit']]);
+        return $this->esphomehubFormular([$suche, $hand], [], [['code' => 102, 'icon' => 'active', 'caption' => 'Ready']]);
     }
 }
