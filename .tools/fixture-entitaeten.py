@@ -58,6 +58,14 @@ liste(p.ListEntitiesClimateResponse(key=16, name="Klima", supported_modes=[p.CLI
                                     visual_min_temperature=7, visual_max_temperature=28, visual_target_temperature_step=0.5, feature_flags=1 | 32))
 liste(p.ListEntitiesEventResponse(key=17, name="Taster", event_types=["single", "double"]))
 liste(p.ListEntitiesSirenResponse(key=18, name="Sirene"))
+# Klimaanlage wie die Mitsubishi-CN105-Komponente (Lüfter, Schwenken) plus eigene Modi, Voreinstellungen und Feuchte
+liste(p.ListEntitiesClimateResponse(key=19, name="Klimaanlage", supported_modes=[p.CLIMATE_MODE_OFF, p.CLIMATE_MODE_COOL, p.CLIMATE_MODE_HEAT, p.CLIMATE_MODE_DRY],
+                                    visual_min_temperature=16, visual_max_temperature=31, visual_target_temperature_step=0.5, feature_flags=1 | 8 | 16 | 32,
+                                    supported_fan_modes=[p.CLIMATE_FAN_AUTO, p.CLIMATE_FAN_QUIET, p.CLIMATE_FAN_LOW, p.CLIMATE_FAN_MEDIUM, p.CLIMATE_FAN_MIDDLE, p.CLIMATE_FAN_HIGH],
+                                    supported_custom_fan_modes=["Turbo"],
+                                    supported_swing_modes=[p.CLIMATE_SWING_OFF, p.CLIMATE_SWING_VERTICAL, p.CLIMATE_SWING_HORIZONTAL, p.CLIMATE_SWING_BOTH],
+                                    supported_presets=[p.CLIMATE_PRESET_NONE, p.CLIMATE_PRESET_ECO, p.CLIMATE_PRESET_BOOST], supported_custom_presets=["Nacht"],
+                                    visual_min_humidity=30, visual_max_humidity=70))
 
 zustand(p.SensorStateResponse(key=1, state=21.47), {"e00000001": 21.5})
 zustand(p.SensorStateResponse(key=1, missing_state=True), {})
@@ -79,6 +87,12 @@ zustand(p.LockStateResponse(key=15, state=p.LOCK_STATE_JAMMED), {"e0000000f_z": 
 zustand(p.ClimateStateResponse(key=16, mode=p.CLIMATE_MODE_HEAT, current_temperature=20.3, target_temperature=21.5, action=p.CLIMATE_ACTION_HEATING),
         {"e00000010_m": 3, "e00000010": 21.5, "e00000010_t": 20.3, "e00000010_a": "Heizt"})
 zustand(p.EventResponse(key=17, event_type="double"), {"e00000011": "double"})
+zustand(p.ClimateStateResponse(key=19, mode=p.CLIMATE_MODE_COOL, current_temperature=25.1, target_temperature=23, action=p.CLIMATE_ACTION_COOLING,
+                               fan_mode=p.CLIMATE_FAN_HIGH, swing_mode=p.CLIMATE_SWING_VERTICAL, preset=p.CLIMATE_PRESET_ECO, current_humidity=48.5, target_humidity=55),
+        {"e00000013_m": 2, "e00000013": 23.0, "e00000013_t": 25.1, "e00000013_a": "Kühlt", "e00000013_l": "HIGH", "e00000013_w": 2, "e00000013_p": "ECO",
+         "e00000013_h": 48.5, "e00000013_g": 55.0})
+zustand(p.ClimateStateResponse(key=19, mode=p.CLIMATE_MODE_COOL, target_temperature=23, custom_fan_mode="Turbo", custom_preset="Nacht", current_humidity=float("nan")),
+        {"e00000013_m": 2, "e00000013": 23.0, "e00000013_t": 0.0, "e00000013_a": "Aus", "e00000013_l": "Turbo", "e00000013_w": 0, "e00000013_p": "Nacht", "e00000013_g": 0.0})
 
 befehl(5, "", True, p.SwitchCommandRequest(key=5, state=True))
 befehl(5, "", False, p.SwitchCommandRequest(key=5, state=False))
@@ -103,6 +117,16 @@ befehl(15, "", False, p.LockCommandRequest(key=15, command=p.LOCK_UNLOCK))
 befehl(15, "s", 2, p.LockCommandRequest(key=15, command=p.LOCK_OPEN))
 befehl(16, "m", 6, p.ClimateCommandRequest(key=16, has_mode=True, mode=p.CLIMATE_MODE_AUTO))
 befehl(16, "", 22.5, p.ClimateCommandRequest(key=16, has_target_temperature=True, target_temperature=22.5))
+befehl(19, "l", "HIGH", p.ClimateCommandRequest(key=19, has_fan_mode=True, fan_mode=p.CLIMATE_FAN_HIGH))
+befehl(19, "l", "AUTO", p.ClimateCommandRequest(key=19, has_fan_mode=True, fan_mode=p.CLIMATE_FAN_AUTO))
+befehl(19, "l", "Turbo", p.ClimateCommandRequest(key=19, has_custom_fan_mode=True, custom_fan_mode="Turbo"))
+befehl(19, "w", 0, p.ClimateCommandRequest(key=19, has_swing_mode=True, swing_mode=p.CLIMATE_SWING_OFF))
+befehl(19, "w", 3, p.ClimateCommandRequest(key=19, has_swing_mode=True, swing_mode=p.CLIMATE_SWING_HORIZONTAL))
+befehl(19, "p", "ECO", p.ClimateCommandRequest(key=19, has_preset=True, preset=p.CLIMATE_PRESET_ECO))
+befehl(19, "p", "NONE", p.ClimateCommandRequest(key=19, has_preset=True, preset=p.CLIMATE_PRESET_NONE))
+befehl(19, "p", "Nacht", p.ClimateCommandRequest(key=19, has_custom_preset=True, custom_preset="Nacht"))
+befehl(19, "g", 55, p.ClimateCommandRequest(key=19, has_target_humidity=True, target_humidity=55))
+befehl(19, "m", 5, p.ClimateCommandRequest(key=19, has_mode=True, mode=p.CLIMATE_MODE_DRY))
 
 ziel = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixture-entitaeten.json")
 with open(ziel, "w") as f:

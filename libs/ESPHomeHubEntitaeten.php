@@ -61,15 +61,24 @@ final class ESPHomeHubEntitaeten
     private const KLIMA_MODI = [0 => 'Off', 1 => 'Heat/cool', 2 => 'Cool', 3 => 'Heat', 4 => 'Fan only', 5 => 'Dehumidify', 6 => 'Auto'];
     private const KLIMA_AKTION = [0 => 'Off', 2 => 'Cooling', 3 => 'Heating', 4 => 'Idle', 5 => 'Drying', 6 => 'Ventilating', 7 => 'Defrosting'];
     private const SCHLOSS = [0 => 'Unknown', 1 => 'Locked', 2 => 'Unlocked', 3 => 'Jammed', 4 => 'Locking …', 5 => 'Unlocking …', 6 => 'Opening …', 7 => 'Opened'];
+    // Lüfter, Schwenken, Voreinstellung: Werte der Variablen sind die Enum-Namen aus api.proto (ohne Präfix),
+    // eigene Modi des Geräts stehen als Text daneben.
+    private const LUEFTER = [0 => 'ON', 1 => 'OFF', 2 => 'AUTO', 3 => 'LOW', 4 => 'MEDIUM', 5 => 'HIGH', 6 => 'MIDDLE', 7 => 'FOCUS', 8 => 'DIFFUSE', 9 => 'QUIET'];
+    private const LUEFTER_TEXT = ['ON' => 'On', 'OFF' => 'Off', 'AUTO' => 'Auto', 'LOW' => 'Low', 'MEDIUM' => 'Medium', 'HIGH' => 'High',
+        'MIDDLE' => 'Middle', 'FOCUS' => 'Focus', 'DIFFUSE' => 'Diffuse', 'QUIET' => 'Quiet'];
+    private const SCHWENK = [0 => 'Off', 1 => 'Both', 2 => 'Vertical', 3 => 'Horizontal'];
+    private const PRESET = [0 => 'NONE', 1 => 'HOME', 2 => 'AWAY', 3 => 'BOOST', 4 => 'COMFORT', 5 => 'ECO', 6 => 'SLEEP', 7 => 'ACTIVITY'];
+    private const PRESET_TEXT = ['NONE' => 'None', 'HOME' => 'Home', 'AWAY' => 'Away', 'BOOST' => 'Boost', 'COMFORT' => 'Comfort', 'ECO' => 'Eco',
+        'SLEEP' => 'Sleep', 'ACTIVITY' => 'Activity'];
     private const BEWEGUNG = [0 => 'Stopped', 1 => 'Opening', 2 => 'Closing'];
 
     /** Klartext für binary_sensor je device_class: [aus, an] */
     private const BINAER = [
         'door' => ['Closed', 'Opened'], 'window' => ['Closed', 'Opened'], 'garage_door' => ['Closed', 'Opened'],
         'opening' => ['Closed', 'Opened'], 'lock' => ['Locked', 'Unlocked'], 'motion' => ['No motion', 'Motion'],
-        'occupancy' => ['Clear', 'Occupied'], 'presence' => ['Away', 'Home'], 'moisture' => ['Dry', 'Wet'],
+        'occupancy' => ['Clear', 'Occupied'], 'presence' => ['Away', 'Present'], 'moisture' => ['Dry', 'Wet'],
         'smoke' => ['No smoke', 'Smoke'], 'gas' => ['No gas', 'Gas'], 'problem' => ['OK', 'Problem'],
-        'connectivity' => ['Disconnected', 'Connected'], 'battery' => ['Normal', 'Low'], 'power' => ['Off', 'On'],
+        'connectivity' => ['Disconnected', 'Connected'], 'battery' => ['Normal', 'Battery low'], 'power' => ['Off', 'On'],
         'plug' => ['Unplugged', 'Plugged in'], 'running' => ['Not running', 'Running'], 'vibration' => ['Calm', 'Vibration'],
         'light' => ['Dark', 'Bright'], 'heat' => ['Normal', 'Hot'], 'cold' => ['Normal', 'Cold'], 'tamper' => ['OK', 'Tampered'],
         'safety' => ['Safe', 'Unsafe'], 'sound' => ['Calm', 'Sound'], 'update' => ['Up to date', 'Update available'],
@@ -132,6 +141,16 @@ final class ESPHomeHubEntitaeten
                     'min'      => $P::floatGlatt($m, 8),
                     'max'      => $P::floatGlatt($m, 9),
                     'schritt'  => $P::floatGlatt($m, 10),
+                    'luefter'  => self::namen($P::zahlen($m, 13), self::LUEFTER),
+                    'luefterEigen' => $P::texte($m, 15),
+                    'schwenk'  => array_values(array_intersect($P::zahlen($m, 14), array_keys(self::SCHWENK))),
+                    'preset'   => self::namen($P::zahlen($m, 16), self::PRESET),
+                    'presetEigen' => $P::texte($m, 17),
+                    // Feature-Flags wie bei ESPHome: 8 = Ist-Feuchte, 16 = Soll-Feuchte
+                    'feuchteIst' => ($flags & 8) !== 0 || $P::bool($m, 22),
+                    'feuchteSoll' => ($flags & 16) !== 0 || $P::bool($m, 23),
+                    'feuchteMin' => $P::floatGlatt($m, 24),
+                    'feuchteMax' => $P::floatGlatt($m, 25),
                 ];
                 break;
             case 'number':
@@ -261,9 +280,56 @@ final class ESPHomeHubEntitaeten
                 if ($e['aktion']) {
                     $out[] = $v('a', $name . ' ' . ESPHomeHubText::t('Action'), VARIABLETYPE_STRING, $anzeige(), false);
                 }
+                $luefter = self::modusTexte($e['luefter'] ?? [], self::LUEFTER_TEXT, $e['luefterEigen'] ?? []);
+                if ($luefter !== []) {
+                    $out[] = $v('l', $name . ' ' . ESPHomeHubText::t('Fan'), VARIABLETYPE_STRING, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung($luefter)], true);
+                }
+                if (($e['schwenk'] ?? []) !== []) {
+                    $schwenk = [];
+                    foreach ($e['schwenk'] as $s) {
+                        $schwenk[$s] = ESPHomeHubText::t(self::SCHWENK[$s]);
+                    }
+                    $out[] = $v('w', $name . ' ' . ESPHomeHubText::t('Swing'), VARIABLETYPE_INTEGER, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung($schwenk)], true);
+                }
+                $preset = self::modusTexte($e['preset'] ?? [], self::PRESET_TEXT, $e['presetEigen'] ?? []);
+                if ($preset !== []) {
+                    $out[] = $v('p', $name . ' ' . ESPHomeHubText::t('Preset'), VARIABLETYPE_STRING, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => self::aufzaehlung($preset)], true);
+                }
+                if ($e['feuchteIst'] ?? false) {
+                    $out[] = $v('h', $name . ' ' . ESPHomeHubText::t('Current humidity'), VARIABLETYPE_FLOAT, $anzeige(['DIGITS' => 0, 'SUFFIX' => ' %']), false);
+                }
+                if ($e['feuchteSoll'] ?? false) {
+                    $out[] = $v('g', $name . ' ' . ESPHomeHubText::t('Target humidity'), VARIABLETYPE_FLOAT, ['PRESENTATION' => VARIABLE_PRESENTATION_SLIDER,
+                        'MIN' => (float)($e['feuchteMin'] ?: 0), 'MAX' => (float)($e['feuchteMax'] ?: 100), 'STEP_SIZE' => 1.0, 'DIGITS' => 0, 'SUFFIX' => ' %'], true);
+                }
                 return $out;
         }
         return [];
+    }
+
+    /** Enum-Nummern des Geräts in Enum-Namen, in der Reihenfolge des Geräts; Unbekanntes fällt weg. */
+    private static function namen(array $nummern, array $tabelle): array
+    {
+        $out = [];
+        foreach ($nummern as $n) {
+            if (isset($tabelle[$n])) {
+                $out[] = $tabelle[$n];
+            }
+        }
+        return $out;
+    }
+
+    /** Auswahl Wert => Anzeigetext: Standardmodi (Enum-Name, übersetzt), dann die eigenen Modi des Geräts. */
+    private static function modusTexte(array $namen, array $texte, array $eigene): array
+    {
+        $o = [];
+        foreach ($namen as $n) {
+            $o[$n] = ESPHomeHubText::t($texte[$n]);
+        }
+        foreach ($eigene as $n) {
+            $o[(string)$n] = (string)$n;
+        }
+        return $o;
     }
 
     /** Wertanzeige-OPTIONS (Bool/String): nur Value, Caption, IconActive, IconValue, ColorActive, ColorValue. */
@@ -394,6 +460,25 @@ final class ESPHomeHubEntitaeten
                     $a = $P::zahl($m, 8);
                     $out[$i('a')] = isset(self::KLIMA_AKTION[$a]) ? ESPHomeHubText::t(self::KLIMA_AKTION[$a]) : ESPHomeHubText::t('State %s', $a);
                 }
+                if (($e['luefter'] ?? []) !== [] || ($e['luefterEigen'] ?? []) !== []) {
+                    $eigen = $P::text($m, 11);
+                    $out[$i('l')] = $eigen !== '' ? $eigen : (self::LUEFTER[$P::zahl($m, 9)] ?? (string)$P::zahl($m, 9));
+                }
+                if (($e['schwenk'] ?? []) !== []) {
+                    $out[$i('w')] = $P::zahl($m, 10);
+                }
+                if (($e['preset'] ?? []) !== [] || ($e['presetEigen'] ?? []) !== []) {
+                    $eigen = $P::text($m, 13);
+                    $out[$i('p')] = $eigen !== '' ? $eigen : (self::PRESET[$P::zahl($m, 12)] ?? (string)$P::zahl($m, 12));
+                }
+                foreach (['feuchteIst' => ['h', 14], 'feuchteSoll' => ['g', 15]] as $merkmal => [$teil, $feld]) {
+                    if ($e[$merkmal] ?? false) {
+                        $f = $P::float($m, $feld);
+                        if (!is_nan($f)) {
+                            $out[$i($teil)] = round($f, 1);
+                        }
+                    }
+                }
                 return $out;
         }
         return [];
@@ -479,6 +564,31 @@ final class ESPHomeHubEntitaeten
                 return [$befehl, $key . $b(6) . $P::feldFloat(7, (float)$wert), null];
             case 'climate/o':
                 return [$befehl, $key . $b(8) . $P::feldFloat(9, (float)$wert), null];
+            case 'climate/l':
+                $n = array_search((string)$wert, self::LUEFTER, true);
+                if ($n !== false && in_array((string)$wert, $e['luefter'] ?? [], true)) {
+                    return [$befehl, $key . $b(12) . $P::feldZahl(13, $n), null];
+                }
+                if (in_array((string)$wert, $e['luefterEigen'] ?? [], true)) {
+                    return [$befehl, $key . $b(16) . $P::feldText(17, (string)$wert), null];
+                }
+                throw new InvalidArgumentException(ESPHomeHubText::t('"%s" is not an option of "%s".', $wert, $e['name']));
+            case 'climate/w':
+                if (!in_array((int)$wert, $e['schwenk'] ?? [], true)) {
+                    throw new InvalidArgumentException(ESPHomeHubText::t('"%s" is not an option of "%s".', $wert, $e['name']));
+                }
+                return [$befehl, $key . $b(14) . $P::feldZahl(15, (int)$wert), null];
+            case 'climate/p':
+                $n = array_search((string)$wert, self::PRESET, true);
+                if ($n !== false && in_array((string)$wert, $e['preset'] ?? [], true)) {
+                    return [$befehl, $key . $b(18) . $P::feldZahl(19, $n), null];
+                }
+                if (in_array((string)$wert, $e['presetEigen'] ?? [], true)) {
+                    return [$befehl, $key . $b(20) . $P::feldText(21, (string)$wert), null];
+                }
+                throw new InvalidArgumentException(ESPHomeHubText::t('"%s" is not an option of "%s".', $wert, $e['name']));
+            case 'climate/g':
+                return [$befehl, $key . $b(22) . $P::feldFloat(23, (float)$wert), null];
         }
         throw new InvalidArgumentException(ESPHomeHubText::t('Unknown action for "%s".', $e['name']));
     }

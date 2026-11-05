@@ -358,7 +358,7 @@ foreach ($fe['liste'] as $l) {
         pruefe(isset(ESPHomeHubEntitaeten::NICHT_UNTERSTUETZT[$l['typ']]), 'nur bekannte Typen übergangen: ' . $l['typ']);
     }
 }
-pruefe(count($ents) === 17, '17 von 18 Entitäten beschrieben');
+pruefe(count($ents) === 18, '18 von 19 Entitäten beschrieben');
 foreach ($fe['zustaende'] as $z) {
     $ist = ESPHomeHubEntitaeten::zustand($z['typ'], (string)hex2bin($z['daten']), $ents[$z['key']]);
     $ok = count($ist) === count($z['erwartet']);
@@ -372,6 +372,41 @@ foreach ($fe['befehle'] as $c) {
     [$typ, $daten] = ESPHomeHubEntitaeten::befehl($e, $c['teil'], $c['wert']);
     pruefe($typ === $c['typ'] && bin2hex($daten) === $c['daten'], 'Befehl ' . $e['typ'] . '/' . $c['teil'] . ' = ' . json_encode($c['wert']) . ': ' . bin2hex($daten) . ' erwartet ' . $c['daten']);
 }
+// Klima mit Lüfter, Schwenken, Voreinstellung und Feuchte (0.6.0)
+$klima = $ents[19];
+$vars = [];
+foreach (ESPHomeHubEntitaeten::variablen($klima, 'Gerät') as $v) {
+    $vars[$v['ident']] = $v;
+}
+$caps = fn (string $ident) => array_column(json_decode($vars[$ident]['pres']['OPTIONS'] ?? '[]', true), 'Caption', 'Value');
+pruefe($caps('e00000013_l') === ['AUTO' => 'Automatik', 'QUIET' => 'Leise', 'LOW' => 'Niedrig', 'MEDIUM' => 'Mittel', 'MIDDLE' => 'Mitte', 'HIGH' => 'Hoch', 'Turbo' => 'Turbo'],
+    'Lüfter: Standardmodi übersetzt, eigener Modus dahinter: ' . json_encode($caps('e00000013_l'), JSON_UNESCAPED_UNICODE));
+pruefe($caps('e00000013_w') === [0 => 'Aus', 2 => 'Vertikal', 3 => 'Horizontal', 1 => 'Beide'], 'Schwenken in Gerätereihenfolge: ' . json_encode($caps('e00000013_w'), JSON_UNESCAPED_UNICODE));
+pruefe($caps('e00000013_p') === ['NONE' => 'Keine', 'ECO' => 'Eco', 'BOOST' => 'Boost', 'Nacht' => 'Nacht'], 'Voreinstellung: ' . json_encode($caps('e00000013_p'), JSON_UNESCAPED_UNICODE));
+pruefe(($vars['e00000013_l']['name'] ?? '') === 'Klimaanlage Lüfter' && ($vars['e00000013_g']['pres']['MIN'] ?? 0) === 30.0 && ($vars['e00000013_g']['pres']['MAX'] ?? 0) === 70.0
+    && !($vars['e00000013_h']['aktion'] ?? true) && ($vars['e00000013_g']['aktion'] ?? false), 'Namen, Feuchte-Grenzen aus dem Gerät, Ist-Feuchte nur Anzeige');
+$alt = array_column(ESPHomeHubEntitaeten::variablen($ents[16], 'Gerät'), 'ident');
+pruefe(array_intersect($alt, ['e00000010_l', 'e00000010_w', 'e00000010_p', 'e00000010_h', 'e00000010_g']) === [], 'Klimagerät ohne Modi/Feuchte bekommt keine neuen Variablen');
+$altZustand = ESPHomeHubEntitaeten::zustand(47, (string)hex2bin($fe['zustaende'][array_search(16, array_column($fe['zustaende'], 'key'), true)]['daten']), $ents[16]);
+pruefe(!array_intersect_key($altZustand, ['e00000010_l' => 1, 'e00000010_w' => 1, 'e00000010_p' => 1]), 'Zustand ohne Modi setzt keine neuen Variablen');
+$abgelehnt = 0;
+foreach ([['l', 'BOGUS'], ['l', 'FOCUS'], ['w', 5], ['p', 'HOME'], ['p', 'nacht']] as [$teil, $w]) {
+    try {
+        ESPHomeHubEntitaeten::befehl($klima, $teil, $w);
+    } catch (InvalidArgumentException $ex) {
+        $abgelehnt++;
+    }
+}
+pruefe($abgelehnt === 5, 'Lüfter/Schwenken/Voreinstellung: nicht gemeldete Werte werden abgelehnt (' . $abgelehnt . '/5)');
+foreach (['l', 'w', 'p', 'g'] as $teil) {
+    try {
+        ESPHomeHubEntitaeten::befehl($ents[16] + ['luefter' => [], 'schwenk' => [], 'preset' => []], $teil, $teil === 'g' ? 50 : 'AUTO');
+        pruefe($teil === 'g', "Klima ohne Modi: Befehl $teil abgelehnt");
+    } catch (InvalidArgumentException $ex) {
+        pruefe($teil !== 'g', "Klima ohne Modi: Befehl $teil abgelehnt");
+    }
+}
+
 $id = ESPHomeHubEntitaeten::ident(0xDEADBEEF, 'h');
 pruefe($id === 'edeadbeef_h' && ESPHomeHubEntitaeten::identLesen($id) === [0xDEADBEEF, 'h'] && ESPHomeHubEntitaeten::identLesen('Verbunden') === null, 'Ident hin und zurück');
 
@@ -472,7 +507,7 @@ pruefe(($info['anzeigename'] ?? '') === 'Simulator Küche' && ($info['modell'] ?
 
 // Entitäten → Variablen
 $v = zustand()['v'];
-pruefe(count(json_decode(geraet()->GetEntities(), true)) === 17, '17 unterstützte Entitäten übernommen (Sirene übergangen)');
+pruefe(count(json_decode(geraet()->GetEntities(), true)) === 18, '18 unterstützte Entitäten übernommen (Sirene übergangen)');
 pruefe(str_contains(zustand()['a']['NichtUnterstuetzt'], 'siren'), 'Sirene als nicht unterstützt vermerkt');
 pruefe(($v['e00000005']['pres']['PRESENTATION'] ?? '') === VARIABLE_PRESENTATION_SWITCH && ($v['e00000005']['aktion'] ?? false), 'Schalter: SWITCH mit Aktion');
 pruefe(($v['e00000001']['pres']['SUFFIX'] ?? '') === ' °C' && ($v['e00000001']['pres']['DIGITS'] ?? -1) === 1 && !isset($v['e00000001']['aktion']), 'Sensor: Einheit, Nachkommastellen, keine Aktion');
@@ -906,7 +941,7 @@ if ($live) {
         $probe = [
             'switch/' => true, 'number/' => 23.5, 'select/' => 'Komfort', 'text/' => 'Grüße aus Symcon', 'light/' => true,
             'light/h' => 40, 'light/f' => 0x00FF00, 'fan/' => true, 'fan/g' => 2, 'cover/' => 30, 'cover/s' => 0, 'valve/s' => 0,
-            'lock/' => true, 'climate/m' => 3, 'climate/u' => 20.5, 'climate/' => 20.5, 'button/' => 0,
+            'lock/' => true, 'climate/m' => 3, 'climate/u' => 20.5, 'climate/o' => 26.5, 'climate/' => 20.5, 'climate/g' => 55.0, 'button/' => 0,
         ];
         $ents = json_decode(geraet()->GetEntities(), true);
         echo '    ' . count($ents) . ' Entitäten: ' . implode(', ', array_map(fn ($e) => $e['typ'] . ' „' . $e['name'] . '"', $ents)) . "\n";
@@ -914,6 +949,11 @@ if ($live) {
             foreach (ESPHomeHubEntitaeten::variablen($e, 'Gerät') as $var) {
                 $teil = (string)(ESPHomeHubEntitaeten::identLesen($var['ident'])[1] ?? '');
                 $wert = $probe[$e['typ'] . '/' . $teil] ?? null;
+                if ($e['typ'] === 'climate' && in_array($teil, ['l', 'w', 'p'], true)) {
+                    // Lüfter/Schwenken/Voreinstellung: die letzte Option, die das Gerät anbietet
+                    $optionen = json_decode($var['pres']['OPTIONS'] ?? '[]', true);
+                    $wert = $optionen === [] ? null : end($optionen)['Value'];
+                }
                 if (!$var['aktion'] || $wert === null) {
                     continue;
                 }

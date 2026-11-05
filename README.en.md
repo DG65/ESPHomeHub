@@ -1,7 +1,7 @@
 # ESPHomeHub
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHP%20module-blue)
-![Module version](https://img.shields.io/badge/Module-0.5.0-informational)
+![Module version](https://img.shields.io/badge/Module-0.6.0-informational)
 ![Symcon version](https://img.shields.io/badge/Symcon-9.0%2B-informational)
 ![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange)
 [![PayPal](https://img.shields.io/badge/PayPal-Donate-blue?logo=paypal)](https://paypal.me/DietmarGureth)
@@ -18,7 +18,7 @@ Bluetooth proxy. In Symcon this used to require MQTT as a detour. ESPHomeHub tal
 the same way Home Assistant does: one TCP connection per device, the device describes itself,
 changes arrive immediately.
 
-**Status 0.5.0:** configurator with device discovery, encrypted connection, keep-alive,
+**Status 0.6.0:** configurator with device discovery, encrypted connection, keep-alive,
 reconnect, device info and all common entities as variables. The user interface follows the
 language of Symcon (English or German). The Bluetooth proxy will be a separate module.
 
@@ -74,7 +74,7 @@ instance, with a matching presentation (unit, decimals, limits, plain text):
 | cover, valve | position in % (otherwise opened/closed), open/stop/close, movement |
 | fan | on/off, speed |
 | lock | locked, open (if supported), state |
-| climate | mode, target temperature (or low/high), current temperature, action |
+| climate | mode, target temperature (or low/high), current temperature, action; depending on the device fan, swing, preset (including custom modes of the device), current and target humidity |
 
 Not supported yet (named in the panel "Entities"): camera, media player, alarm panel, siren,
 date/time, update, water heater, infrared/radio frequency.
@@ -86,6 +86,17 @@ error message.
 ```php
 RequestAction($variableID, true);                // e.g. switch on the variable "Relay"
 IPS_RequestAction($id, 'e6d53a046_h', 40);       // light to 40 % (ident from the panel "Entities")
+```
+
+Fan and preset take the name of the mode as ESPHome knows it (`AUTO`, `QUIET`, `LOW`, `MEDIUM`,
+`MIDDLE`, `HIGH`, … or `NONE`, `ECO`, `BOOST`, …), custom modes of the device their name from the
+YAML; swing is a number (0 off, 1 both, 2 vertical, 3 horizontal). This fits, for example,
+Mitsubishi air conditioners with the component MitsubishiCN105ESPHome; their vane positions come as
+separate select entities.
+
+```php
+RequestAction($fanVariable, 'HIGH');             // climate fan to high
+RequestAction($swingVariable, 2);                // vanes swing vertically
 ```
 
 The ident of a variable is the `key` of the entity (`e` + 8 hex characters, partial variables with

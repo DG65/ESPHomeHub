@@ -1,7 +1,7 @@
 # ESPHomeHub
 
 ![Symcon](https://img.shields.io/badge/Symcon-PHPModul-blue)
-![Modul Version](https://img.shields.io/badge/Modul-0.5.0-informational)
+![Modul Version](https://img.shields.io/badge/Modul-0.6.0-informational)
 ![Symcon Version](https://img.shields.io/badge/Symcon-9.0%2B-informational)
 ![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange)
 [![Check Style](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml/badge.svg)](https://github.com/DG65/ESPHomeHub/actions/workflows/check-style.yml)
@@ -19,7 +19,7 @@ ein Licht oder einen Bluetooth-Proxy. Bisher ging das in Symcon nur über MQTT a
 ESPHomeHub spricht das Gerät so an wie Home Assistant: eine TCP-Verbindung je Gerät, das Gerät
 beschreibt sich selbst, Änderungen kommen sofort.
 
-**Stand 0.5.0:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
+**Stand 0.6.0:** Konfigurator mit Gerätesuche, Verbindung mit Verschlüsselung, Lebenszeichen,
 Wiederverbinden, Geräteinfo und alle gängigen Entitäten als Variablen. Die Oberfläche folgt der
 Sprache von Symcon (Deutsch oder Englisch). Der Bluetooth-Proxy wird ein eigenes Modul.
 
@@ -75,7 +75,7 @@ der Instanz, mit passender Darstellung (Einheit, Nachkommastellen, Grenzen, Klar
 | cover, valve | Position in % (sonst Offen/Geschlossen), Öffnen/Stopp/Schließen, Bewegung |
 | fan | An/Aus, Stufe |
 | lock | Verriegelt, Öffnen (falls unterstützt), Zustand |
-| climate | Betriebsart, Solltemperatur (bzw. unten/oben), Ist-Temperatur, Tätigkeit |
+| climate | Betriebsart, Solltemperatur (bzw. unten/oben), Ist-Temperatur, Tätigkeit; je nach Gerät Lüfter, Schwenken, Voreinstellung (auch eigene Modi des Geräts), Ist- und Soll-Feuchte |
 
 Noch nicht unterstützt (im Panel „Entitäten" genannt): Kamera, Medienplayer, Alarmanlage, Sirene,
 Datum/Uhrzeit, Update, Warmwasserbereiter, Infrarot/Funk.
@@ -87,6 +87,17 @@ getrennter Verbindung gibt es eine Fehlermeldung.
 ```php
 RequestAction($variablenID, true);               // z. B. Variable „Relais" einschalten
 IPS_RequestAction($id, 'e6d53a046_h', 40);       // Licht auf 40 % (Ident aus dem Panel „Entitäten")
+```
+
+Lüfter und Voreinstellung nehmen den Namen des Modus an, wie ESPHome ihn kennt (`AUTO`, `QUIET`,
+`LOW`, `MEDIUM`, `MIDDLE`, `HIGH`, … bzw. `NONE`, `ECO`, `BOOST`, …), eigene Modi des Geräts ihren
+Namen aus der YAML; Schwenken ist eine Zahl (0 aus, 1 beide, 2 vertikal, 3 horizontal). Das passt
+z. B. zu Mitsubishi-Klimageräten mit der Komponente MitsubishiCN105ESPHome; deren
+Lamellenstellungen kommen als eigene Auswahl-Entitäten dazu.
+
+```php
+RequestAction($lueftervariable, 'HIGH');         // Klima-Lüfter auf hoch
+RequestAction($schwenkvariable, 2);              // Lamellen schwenken vertikal
 ```
 
 Der Ident einer Variable ist der `key` der Entität (`e` + 8 Hex-Zeichen, Teilvariablen mit Endung).

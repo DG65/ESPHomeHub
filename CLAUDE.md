@@ -110,6 +110,20 @@
   deutscher Text mehr im Code ist. Englischer Lauf: `ESPHOMEHUB_SPRACHE=en php .tools/test-esphomehub.php` (deutsche Prüftexte
   schlagen dort erwartungsgemäß fehl; `ESPHOMEHUB_FORMULAR=datei.json` schreibt das Geräteformular zum Ansehen).
 
+## Klima: Lüfter, Schwenken, Voreinstellung, Feuchte (0.6.0)
+
+- Auftrag Dietmar 05.11.2026 (Mitsubishi-Multisplit über MitsubishiCN105ESPHome geplant). Felder aus api.proto 46.12.0:
+  ListEntitiesClimate 13 fan_modes, 14 swing_modes, 15 custom_fan_modes, 16 presets, 17 custom_presets, 22–25 Feuchte, 27 feature_flags
+  (8 = Ist-Feuchte, 16 = Soll-Feuchte); State 9–15; Command 12/13, 14/15, 16/17, 18/19, 20/21, 22/23.
+- Teilvariablen: `_l` Lüfter (Text: Enum-Name wie `HIGH` oder eigener Modus), `_w` Schwenken (Zahl 0–3), `_p` Voreinstellung (Text),
+  `_h` Ist-Feuchte, `_g` Soll-Feuchte. Nur angelegt, wenn das Gerät Optionen meldet; Reihenfolge wie vom Gerät.
+- Englische Schlüssel getrennt, damit eindeutig: Akku „Battery low" (Schwach) statt „Low", Anwesenheit „Present" statt „Home";
+  „Low" = Niedrig (Lüfter), „Home" = Zuhause (Voreinstellung).
+- CN105: echte Lüfter-/Schwenkmodi; Lamellenstellungen sind eigene select-Entitäten (keine Doppelung). Raumtemperatur holt die
+  Komponente per `homeassistant`-Sensor — das kann ESPHomeHub nicht (Umweg: template-number in der YAML).
+- Live 05.11.2026 am Container-Thermostat „Klimaanlage" (test.yaml auf smarthome, Sicherung test.yaml.vor-klima): Lüfter, Schwenken,
+  Voreinstellung, Ist-Feuchte bestätigt. An echtem Klimagerät noch nie.
+
 ## Offen / am echten Gerät prüfen
 
 - Kein echter ESP32/ESP8266 getestet, nur Host-Plattform auf dem Mac.

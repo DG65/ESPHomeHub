@@ -37,6 +37,9 @@ trait ESPHomeHubFormular
         '0.5.0' => [
             '• 🌐 New: English user interface — ESPHomeHub follows the language of Symcon.',
         ],
+        '0.6.0' => [
+            '• ❄️ New for climate devices: fan, swing, preset and humidity as variables, whenever the device offers them.',
+        ],
         '0.2.0' => [
             '• 🧩 Sensors, switches, lights, covers, fans, locks, climate and more become variables automatically — switchable ones can be operated directly.',
             '• A variable only takes a new value once the device confirms it.',
