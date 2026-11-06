@@ -241,6 +241,21 @@ function deutsch(string $t): string
     return $GLOBALS['LOCALE_DE'][$t] ?? $t;
 }
 require_once $ROOT . '/libs/ESPHomeHubText.php';
+/** Wie die Symcon-Konsole: übersetzt caption/label des Formulars über locale.json (nur exakte Treffer). */
+function konsole(string $json): string
+{
+    $weg = function ($teil) use (&$weg) {
+        foreach ($teil as $k => $v) {
+            if (is_array($v)) {
+                $teil[$k] = $weg($v);
+            } elseif (in_array($k, ['caption', 'label'], true) && is_string($v)) {
+                $teil[$k] = $GLOBALS['LOCALE_DE'][$v] ?? $v;
+            }
+        }
+        return $teil;
+    };
+    return (string)json_encode($weg(json_decode($json, true)));
+}
 ESPHomeHubText::setzen('deutsch');
 require_once $ROOT . '/ESPHomeHubGeraet/module.php';
 require_once $ROOT . '/ESPHomeHubKonfigurator/module.php';
@@ -675,7 +690,7 @@ $k = new ESPHomeHubKonfigurator(11000);
 $k->Create();
 $GLOBALS['Z'][11000]['p']['Adressen'] = json_encode([['Adresse' => '192.168.2.78', 'Port' => 6053], ['Adresse' => '10.0.5.9', 'Port' => 6060]]);
 $k->ApplyChanges();
-$form = json_decode((string)$k->GetConfigurationForm(), true);
+$form = json_decode(konsole($k->GetConfigurationForm()), true);
 pruefe(is_array($form), 'Konfigurator-Formular ist gültiges JSON');
 $konf = null;
 array_walk_recursive($form, function () {});
@@ -702,7 +717,7 @@ pruefe(($zeilen['10.0.5.9']['quelle'] ?? '') === 'von Hand eingetragen' && ($zei
 // Hand-Adresse, zu der schon eine Instanz gehört: MAC/Version aus deren Geräteinfo (live 28.10.2026)
 $GLOBALS['ZC'] = [];
 $GLOBALS['Z'][11000]['p']['Adressen'] = json_encode([['Adresse' => '192.168.2.50', 'Port' => 6053]]);
-$hz = json_decode((string)$k->GetConfigurationForm(), true);
+$hz = json_decode(konsole($k->GetConfigurationForm()), true);
 $hw = [];
 array_walk_recursive($hz, function () {});
 foreach ($hz['elements'] as $el) {
@@ -732,7 +747,7 @@ pruefe(array_filter($acks, fn ($a) => str_starts_with($a, 'ESPH_')) === [] && in
 $GLOBALS['ZC'] = [];
 $GLOBALS['Z'][11000]['p']['Adressen'] = '[]';
 $z = json_decode($k->GetDevices(), true);
-$form = json_decode((string)$k->GetConfigurationForm(), true);
+$form = json_decode(konsole($k->GetConfigurationForm()), true);
 $werte = $form['elements'][array_key_last(array_filter($form['elements'], fn ($e) => str_contains($e['caption'] ?? '', 'Geräte im Netz')))]['items'][2]['values'] ?? [];
 pruefe($z === [] && count($werte) === 1 && $werte[0]['instanceID'] === 10000 && $werte[0]['quelle'] === 'nicht gefunden' && !isset($werte[0]['create']), 'nicht gefundene Instanz wird ohne „Anlegen" gelistet');
 
@@ -740,7 +755,7 @@ pruefe($z === [] && count($werte) === 1 && $werte[0]['instanceID'] === 10000 && 
 $GLOBALS['DNSSD'] = [];
 $GLOBALS['Z'][11000]['p']['Adressen'] = json_encode([['Adresse' => 'esp.local', 'Port' => 6053]]);
 $z = json_decode($k->GetDevices(), true);
-$form = (string)$k->GetConfigurationForm();
+$form = konsole($k->GetConfigurationForm());
 pruefe(count($z) === 1 && str_contains($form, 'Keine DNS-SD-Instanz'), 'ohne DNS-SD: Hinweis, Hand-Adresse bleibt');
 $GLOBALS['DNSSD'] = [10244];
 ob_start();
@@ -766,7 +781,7 @@ $fach = ['Verbindung', 'Gerät', 'Entitäten'];
 $nurFach = fn (array $p) => array_values(array_filter($p, fn ($x) => in_array(preg_replace('/\s*\(.*$/u', '', $x[0]), $fach, true)));
 
 $GLOBALS['Z'][10000]['p']['FormLayout'] = '[]';
-$p = $panels(geraet()->GetConfigurationForm());
+$p = $panels(konsole(geraet()->GetConfigurationForm()));
 $t = $titel($p);
 $iAufbau = array_search('Formular: Aufbau', $t, true);
 $iRueck = array_search('Rückmeldungen', $t, true);
@@ -782,7 +797,7 @@ $GLOBALS['Z'][10000]['p']['FormLayout'] = json_encode([
     ['Key' => 'verbindung', 'Opened' => true, 'Closed' => true, 'Hidden' => false, 'Pos' => 3],
     ['Key' => 'gibtsnicht', 'Hidden' => true, 'Pos' => 1],
 ]);
-$json = geraet()->GetConfigurationForm();
+$json = konsole(geraet()->GetConfigurationForm());
 $f = $nurFach($panels($json));
 pruefe(array_column($f, 0) === ['Entitäten', 'Gerät', 'Verbindung'], 'Position bestimmt die Reihenfolge: ' . implode(', ', array_column($f, 0)));
 pruefe($f[0][1] === true, 'Aufgeklappt wirkt');
@@ -803,10 +818,10 @@ $keySpalte = array_values(array_filter($liste['columns'] ?? [], fn ($c) => $c['n
 pruefe(($keySpalte['visible'] ?? true) === false && ($keySpalte['save'] ?? false) === true, 'Schlüssel-Spalte unsichtbar mit save:true');
 
 $GLOBALS['Z'][10000]['p']['FormLayout'] = json_encode([['Key' => 'geraet', 'Pos' => 1], ['Key' => 'verbindung', 'Pos' => 1]]);
-$f = $nurFach($panels(geraet()->GetConfigurationForm()));
+$f = $nurFach($panels(konsole(geraet()->GetConfigurationForm())));
 pruefe(array_column($f, 0) === ['Verbindung', 'Gerät', 'Entitäten'], 'Gleiche Position → Standardreihenfolge, fehlender Schlüssel → Standardposition');
 $GLOBALS['Z'][10000]['p']['FormLayout'] = 'kaputt';
-pruefe(array_column($nurFach($panels(geraet()->GetConfigurationForm())), 0) === $fach, 'Unlesbare Einstellung → Standard');
+pruefe(array_column($nurFach($panels(konsole(geraet()->GetConfigurationForm()))), 0) === $fach, 'Unlesbare Einstellung → Standard');
 
 $GLOBALS['FORMFELD'] = [];
 $antwort = geraet()->ResetFormLayout();
@@ -819,10 +834,15 @@ $GLOBALS['Z'][10000]['p']['FormLayout'] = '[]';
 $kk = new ESPHomeHubKonfigurator(11500);
 $kk->Create();
 $kk->ApplyChanges();
-pruefe(!str_contains((string)$kk->GetConfigurationForm(), '"FormLayout"') && !str_contains((string)$kk->GetConfigurationForm(), '🪟  Formular: Aufbau'), 'Konfigurator (zwei Fachpanels) ohne Aufbau-Panel');
+pruefe(!str_contains(konsole($kk->GetConfigurationForm()), '"FormLayout"') && !str_contains(konsole($kk->GetConfigurationForm()), '🪟  Formular: Aufbau'), 'Konfigurator (zwei Fachpanels) ohne Aufbau-Panel');
 
 // ------------------------------------------------------------------ 5. Store-Regeln
 abschnitt('Store-Regeln');
+$roh = json_decode((string)geraet()->GetConfigurationForm(), true);
+$rohCaps = [];
+array_walk_recursive($roh, function ($v, $k) use (&$rohCaps) { if ($k === 'caption') { $rohCaps[] = $v; } });
+pruefe(in_array('🔌  Connection', $rohCaps, true) && !in_array('🔌  Verbindung', $rohCaps, true) && in_array('Connected', array_column($roh['status'], 'caption'), true),
+    'Formular nicht selbst übersetzt: feste Überschriften bleiben englisch, die Konsole übersetzt (SUITE.md 25)');
 if (getenv('ESPHOMEHUB_FORMULAR')) {
     file_put_contents(getenv('ESPHOMEHUB_FORMULAR'), geraet()->GetConfigurationForm());
 }

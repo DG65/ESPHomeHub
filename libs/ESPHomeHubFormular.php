@@ -232,21 +232,9 @@ trait ESPHomeHubFormular
             $aufbau,
             [$this->formRueckmeldung(), $this->formLizenz()]
         )));
-        return (string)json_encode(['elements' => $this->formUebersetzen($elements), 'actions' => $this->formUebersetzen($aktionen),
-            'status' => $this->formUebersetzen($status)]);
-    }
-
-    /** Übersetzt alle Überschriften im Formular (Quelltexte englisch, Deutsch in locale.json). */
-    private function formUebersetzen(array $teil): array
-    {
-        foreach ($teil as $k => $v) {
-            if (is_array($v)) {
-                $teil[$k] = $this->formUebersetzen($v);
-            } elseif ($k === 'caption' && is_string($v)) {
-                $teil[$k] = ESPHomeHubText::t($v);
-            }
-        }
-        return $teil;
+        // Feste Überschriften bleiben englisch, die Konsole übersetzt sie über locale.json (Store-Review, SUITE.md 25).
+        // Selbst übersetzt werden nur Zeilen mit eingesetzten Werten und Listenwerte.
+        return (string)json_encode(['elements' => $elements, 'actions' => $aktionen, 'status' => $status]);
     }
 
     /**

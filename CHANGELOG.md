@@ -4,6 +4,7 @@
 
 - Klimageräte: neue Variablen **Lüfter**, **Schwenken** und **Voreinstellung** (vordefinierte und eigene Modi des Geräts) sowie **Ist-Feuchte** und **Soll-Feuchte**, jeweils nur, wenn das Gerät sie meldet. Werte werden erst nach Bestätigung durch das Gerät übernommen. Passt z. B. zur Mitsubishi-Komponente MitsubishiCN105ESPHome (Lüfterstufen, Schwenkmodi); deren Lamellenstellungen sind eigene Auswahl-Entitäten und gingen schon vorher.
 - Bestehende Klima-Variablen bleiben unverändert.
+- Formular: feste Texte übersetzt jetzt die Symcon-Konsole selbst, das Modul übersetzt nur noch Zeilen mit eingesetzten Werten (Hinweis aus dem Store-Review).
 - Geprüft byte-genau gegen aioesphomeapi und live an einem ESPHome-Thermostat im Testcontainer; an einem echten Klimagerät noch nicht.
 
 ## 0.5.0 (04.11.2026)

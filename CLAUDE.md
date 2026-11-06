@@ -101,7 +101,9 @@
 
 - Quelltexte englisch, Deutsch in `libs/locale.json` → `php .tools/locale-bauen.php` kopiert sie in beide Modulordner (Prüfstand
   vergleicht). Bibliotheken übersetzen über `ESPHomeHubText::t('English %s', …)`, den Übersetzer setzt jedes Modul im Konstruktor
-  (`$this->Translate`). Das Formular läuft am Ende durch `formUebersetzen()` (alle `caption`), Texte mit Werten übersetzt die Stelle selbst.
+  (`$this->Translate`). **Formular nicht selbst übersetzen** (Store-Review, SUITE.md 25, seit 0.6.0): feste `caption` bleiben englisch, die
+  Konsole übersetzt sie über locale.json; selbst übersetzt werden nur Zeilen mit eingesetzten Werten und Listenwerte. Prüfstand bildet die
+  Konsole mit `konsole()` nach und prüft, dass das rohe Formular englisch bleibt.
 - **Kennungen bleiben deutsch:** Idents (`Verbunden`, `e…_h`), Funktionsnamen, Property-/Attribut-/Listenfeldnamen (`Adresse`!),
   JSON-Schlüssel von GetDeviceInfo/GetEntities, Aliase. Logik nie an angezeigten Text hängen. Debug-Ausgaben bleiben deutsch.
 - Englische Schlüssel müssen eindeutig sein: „Open" = Öffnen (Befehl), „Opened" = Offen (Zustand); „Light" = Licht, „Bright" = Hell;
